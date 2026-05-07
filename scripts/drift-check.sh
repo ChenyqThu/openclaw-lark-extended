@@ -26,10 +26,10 @@ if [[ ! -d "$TARGET" ]]; then
   exit 1
 fi
 
-# Same exclusion set as deploy.sh — these are dev-only artifacts that don't deploy.
-# .omc/ is a runtime metadata directory written by OMC's plugin probe; it appears
-# in the live extension dir as a side-effect of gateway operation, not from the
-# fork's source tree.
+# Exclusions cover dev-only artifacts (scripts/, test/, examples/, docs/),
+# runtime metadata that the gateway itself writes (.omc/), and top-level
+# Markdown docs which are not runtime-relevant. The exclusion set must stay
+# in sync with deploy.sh so that "deploy then drift-check" is reliably clean.
 diff -qr \
   --exclude='.git' \
   --exclude='node_modules' \
@@ -38,8 +38,9 @@ diff -qr \
   --exclude='examples' \
   --exclude='docs' \
   --exclude='.omc' \
-  --exclude='MIGRATION.md' \
-  --exclude='DEPLOY.md' \
+  --exclude='*.md' \
+  --exclude='HANDOFF-*' \
+  --exclude='pnpm-lock.yaml' \
   "$FORK/" "$TARGET/" \
   2>/dev/null > /tmp/drift-check-$$.out
 rc=$?
