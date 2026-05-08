@@ -51,6 +51,7 @@ const outbound_1 = require("../messaging/outbound/outbound.js");
 const actions_1 = require("../messaging/outbound/actions.js");
 const policy_1 = require("../messaging/inbound/policy.js");
 const lark_client_1 = require("../core/lark-client.js");
+const shutdown_hooks_1 = require("../core/shutdown-hooks.js");
 const send_1 = require("../messaging/outbound/send.js");
 const targets_1 = require("../core/targets.js");
 const onboarding_auth_1 = require("../tools/onboarding-auth.js");
@@ -59,6 +60,47 @@ const config_schema_1 = require("../core/config-schema.js");
 const config_adapter_1 = require("./config-adapter.js");
 const directory_1 = require("./directory.js");
 const pluginLog = (0, lark_logger_1.larkLogger)('channel/plugin');
+// ---------------------------------------------------------------------------
+// Streaming-card abort backstop on process signals.
+//
+// Why: gateway.stopAccount (below) is the primary path that drains
+// streaming-card shutdown hooks while the LarkClient cache is still alive.
+// But OpenClaw's gateway shutdown also has a force-exit timer and the
+// 5s `CHANNEL_STOP_ABORT_TIMEOUT_MS` window in server-channels.js — if a
+// supervisor sends SIGTERM/SIGINT directly (or stopAccount is bypassed),
+// this listener gives drainShutdownHooks a head start so the CardKit API
+// calls have time to complete before the process dies.
+//
+// SIGUSR1 is deliberately NOT registered: OpenClaw's gateway run loop uses
+// `process.listenerCount("SIGUSR1") > 0` as a gate for its restart
+// arbitration logic (run.js:280 in the bundled runtime), and we don't want
+// to perturb that.
+let earlyDrainFired = false;
+const earlyDrainOnSignal = (signal) => () => {
+    if (earlyDrainFired)
+        return;
+    earlyDrainFired = true;
+    try {
+        console.error(`[lark-plugin] earlyDrain(${signal}): start`);
+    }
+    catch { /* stderr unavailable */ }
+    shutdown_hooks_1.drainShutdownHooks({
+        deadlineMs: 15000,
+        log: (msg) => {
+            try {
+                console.error(`[lark-plugin] earlyDrain(${signal}): ${msg}`);
+            }
+            catch { /* stderr unavailable */ }
+        },
+    }).catch((err) => {
+        try {
+            console.error(`[lark-plugin] earlyDrain(${signal}) failed: ${String(err)}`);
+        }
+        catch { /* stderr unavailable */ }
+    });
+};
+process.on('SIGTERM', earlyDrainOnSignal('SIGTERM'));
+process.on('SIGINT', earlyDrainOnSignal('SIGINT'));
 /** 状态轮询的探针结果缓存时长（5 分钟）。 */
 const PROBE_CACHE_TTL_MS = 5 * 60 * 1000;
 // ---------------------------------------------------------------------------
@@ -303,6 +345,19 @@ exports.feishuPlugin = {
         },
         stopAccount: async (ctx) => {
             ctx.log?.info(`stopping feishu[${ctx.accountId}]`);
+            // Drain streaming-card shutdown hooks BEFORE disposing the cached
+            // LarkClient, so abortCard's CardKit API calls hit the live SDK
+            // client. The SDK awaits stopAccount before opening its 5s
+            // `waitForChannelStopGracefully` window, so time spent here does
+            // not count against that budget — only against the gateway's
+            // overall force-exit timer (default 25s for stop, 5min+ for
+            // restart drain). 15s is well within that headroom while still
+            // covering slow CardKit round-trips. Idempotent: monitor.js's
+            // post-WS drain becomes a no-op once we clear the registry here.
+            await shutdown_hooks_1.drainShutdownHooks({
+                deadlineMs: 15000,
+                log: (msg) => ctx.log?.info?.(msg),
+            });
             await lark_client_1.LarkClient.clearCache(ctx.accountId);
             ctx.log?.info(`stopped feishu[${ctx.accountId}]`);
         },
