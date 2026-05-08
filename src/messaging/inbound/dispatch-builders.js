@@ -22,32 +22,41 @@ const mention_1 = require("./mention.js");
 // Mention annotation
 // ---------------------------------------------------------------------------
 /**
- * Build a `[System: ...]` mention annotation when the message @-mentions
- * non-bot users.  Returns `undefined` when there are no user mentions.
+ * Build a `[System: ...]` mention annotation for the message.
  *
- * Sender identity / chat metadata are handled by the SDK's own
- * `buildInboundUserContextPrefix` (via SenderId, SenderName, ReplyToBody,
- * InboundHistory, etc.), so we only inject the mention data that the SDK
- * does not natively support.
+ * Two independent fragments may be emitted:
+ *
+ *   1. A list of non-bot @-mentioned users (with open_ids), to teach the
+ *      LLM how to @-tag them in a reply.
+ *   2. An explicit "you were @-mentioned, you MUST respond" directive,
+ *      emitted when `opts.wasMentioned` is true. This compensates for
+ *      `stripBotMentions` removing the bot's own @tag from the body and
+ *      `nonBotMentions` filtering it out of the list above — without
+ *      this, the LLM sees no signal it was addressed and may pick
+ *      NO_REPLY (especially in group chats with multiple @-tagged bots).
+ *
+ * `wasMentioned` is the same boolean that flows into the SDK's
+ * `WasMentioned` field — computed once in dispatch.js so the @all branch
+ * (and any future broadening of the rule) applies here automatically.
+ *
+ * Returns `undefined` when neither fragment is needed. Sender identity /
+ * chat metadata are handled by the SDK's own
+ * `buildInboundUserContextPrefix` and are not duplicated here.
  */
-function buildMentionAnnotation(ctx) {
+function buildMentionAnnotation(ctx, opts) {
+    const wasMentioned = opts?.wasMentioned === true;
     const mentions = (0, mention_1.nonBotMentions)(ctx);
-    // Primary: mentionedBot() uses botOpenId to identify self-mention.
-    // Fallback: if any mention was filtered out (not in nonBotMentions), the bot was @-mentioned.
-    const botWasMentioned = (0, mention_1.mentionedBot)(ctx) ||
-        (ctx.mentions && ctx.mentions.length > mentions.length);
-    if (mentions.length === 0 && !botWasMentioned)
+    if (mentions.length === 0 && !wasMentioned)
         return undefined;
     const parts = [];
     if (mentions.length > 0) {
         const mentionDetails = mentions.map((t) => `${t.name} (open_id: ${t.openId})`).join(', ');
         parts.push(`[System: This message @mentions the following users: ${mentionDetails}. Use these open_ids when performing actions involving these users. To @mention in a reply, use \`<at user_id="ou_xxx">Name</at>\`; plain "@Name" won't notify.]`);
     }
-    // Patch: when the bot itself is @-mentioned, make it explicit so the LLM knows it MUST respond.
-    if (botWasMentioned) {
+    if (wasMentioned) {
         parts.push(`[System: You were explicitly @-mentioned in this message. You MUST respond — do NOT output NO_REPLY.]`);
     }
-    return parts.length > 0 ? parts.join('\n') : undefined;
+    return parts.join('\n');
 }
 // ---------------------------------------------------------------------------
 // Message body builders
@@ -61,7 +70,7 @@ function buildMentionAnnotation(ctx) {
  * the body cleaner and avoiding misleading heuristics for non-text
  * message types (merge_forward, interactive cards, etc.).
  */
-function buildMessageBody(ctx, quotedContent) {
+function buildMessageBody(ctx, quotedContent, opts) {
     let messageBody = ctx.content;
     if (quotedContent) {
         messageBody = `[Replying to: "${quotedContent}"]\n\n${ctx.content}`;
@@ -75,7 +84,7 @@ function buildMessageBody(ctx, quotedContent) {
     } else {
         messageBody = `${speaker}: ${messageBody}`;
     }
-    const mentionAnnotation = buildMentionAnnotation(ctx);
+    const mentionAnnotation = buildMentionAnnotation(ctx, opts);
     if (mentionAnnotation) {
         messageBody += `\n\n${mentionAnnotation}`;
     }
@@ -100,8 +109,8 @@ function buildMessageBody(ctx, quotedContent) {
  * The SDK's `detectAndLoadPromptImages` will discover image paths from
  * the text and inject them as multimodal content blocks.
  */
-function buildBodyForAgent(ctx) {
-    const mentionAnnotation = buildMentionAnnotation(ctx);
+function buildBodyForAgent(ctx, opts) {
+    const mentionAnnotation = buildMentionAnnotation(ctx, opts);
     if (mentionAnnotation) {
         return `${ctx.content}\n\n${mentionAnnotation}`;
     }
