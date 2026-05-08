@@ -288,8 +288,20 @@ async function dispatchToAgent(params) {
             baseSessionKey: dc.route.sessionKey,
         });
     }
-    // 2. Build annotated message body
-    const messageBody = (0, dispatch_builders_1.buildMessageBody)(params.ctx, params.quotedContent);
+    // 2. Compute wasMentioned once — SSOT shared by Body, BodyForAgent,
+    //    and the SDK's WasMentioned field. Includes @all per group config
+    //    so the "you were @-mentioned, you MUST respond" directive in the
+    //    annotation covers @所有人 too.
+    const wasMentioned = (0, mention_1.mentionedBot)(params.ctx) ||
+        (params.ctx.mentionAll &&
+            (0, gate_1.resolveRespondToMentionAll)({
+                groupConfig: params.groupConfig,
+                defaultConfig: params.defaultGroupConfig,
+                accountFeishuCfg: params.account.config,
+            }));
+    const buildOpts = { wasMentioned };
+    // 2a. Build annotated message body
+    const messageBody = (0, dispatch_builders_1.buildMessageBody)(params.ctx, params.quotedContent, buildOpts);
     // 3. Permission-error notification (optional side-effect).
     //    Isolated so a failure here does not block the main message dispatch.
     //    Skipped for comment targets: the streaming card dispatcher inside
@@ -308,7 +320,7 @@ async function dispatchToAgent(params) {
     // 5. Build BodyForAgent with mention annotation (if any).
     //    SDK >= 2026.2.10 no longer falls back to Body for BodyForAgent,
     //    so we must set it explicitly to preserve the annotation.
-    const bodyForAgent = (0, dispatch_builders_1.buildBodyForAgent)(params.ctx);
+    const bodyForAgent = (0, dispatch_builders_1.buildBodyForAgent)(params.ctx, buildOpts);
     // 6. Build InboundHistory for SDK metadata injection (>= 2026.2.10).
     //    The SDK's buildInboundUserContextPrefix renders these as structured
     //    JSON blocks; earlier SDK versions simply ignore unknown fields.
@@ -341,13 +353,7 @@ async function dispatchToAgent(params) {
         senderName: params.ctx.senderName ?? params.ctx.senderId,
         senderId: params.ctx.senderId,
         messageSid: params.ctx.messageId,
-        wasMentioned: (0, mention_1.mentionedBot)(params.ctx) ||
-            (params.ctx.mentionAll &&
-                (0, gate_1.resolveRespondToMentionAll)({
-                    groupConfig: params.groupConfig,
-                    defaultConfig: params.defaultGroupConfig,
-                    accountFeishuCfg: params.account.config,
-                })),
+        wasMentioned,
         replyToBody: params.quotedContent,
         inboundHistory,
         extraFields: {
