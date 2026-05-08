@@ -32,10 +32,22 @@ const mention_1 = require("./mention.js");
  */
 function buildMentionAnnotation(ctx) {
     const mentions = (0, mention_1.nonBotMentions)(ctx);
-    if (mentions.length === 0)
+    // Primary: mentionedBot() uses botOpenId to identify self-mention.
+    // Fallback: if any mention was filtered out (not in nonBotMentions), the bot was @-mentioned.
+    const botWasMentioned = (0, mention_1.mentionedBot)(ctx) ||
+        (ctx.mentions && ctx.mentions.length > mentions.length);
+    if (mentions.length === 0 && !botWasMentioned)
         return undefined;
-    const mentionDetails = mentions.map((t) => `${t.name} (open_id: ${t.openId})`).join(', ');
-    return `[System: This message @mentions the following users: ${mentionDetails}. Use these open_ids when performing actions involving these users. To @mention in a reply, use \`<at user_id="ou_xxx">Name</at>\`; plain "@Name" won't notify.]`;
+    const parts = [];
+    if (mentions.length > 0) {
+        const mentionDetails = mentions.map((t) => `${t.name} (open_id: ${t.openId})`).join(', ');
+        parts.push(`[System: This message @mentions the following users: ${mentionDetails}. Use these open_ids when performing actions involving these users. To @mention in a reply, use \`<at user_id="ou_xxx">Name</at>\`; plain "@Name" won't notify.]`);
+    }
+    // Patch: when the bot itself is @-mentioned, make it explicit so the LLM knows it MUST respond.
+    if (botWasMentioned) {
+        parts.push(`[System: You were explicitly @-mentioned in this message. You MUST respond — do NOT output NO_REPLY.]`);
+    }
+    return parts.length > 0 ? parts.join('\n') : undefined;
 }
 // ---------------------------------------------------------------------------
 // Message body builders
