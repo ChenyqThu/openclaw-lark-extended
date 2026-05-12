@@ -35,6 +35,7 @@ const index_1 = require("../../commands/index.js");
 const send_1 = require("../outbound/send.js");
 const dispatch_commands_1 = require("./dispatch-commands.js");
 const dispatch_builders_1 = require("./dispatch-builders.js");
+const sentinel_store_1 = require("./sentinel-store.js");
 const dispatch_context_1 = require("./dispatch-context.js");
 const mention_1 = require("./mention.js");
 const gate_1 = require("./gate.js");
@@ -209,6 +210,7 @@ async function dispatchNormalMessage(dc, ctxPayload, chatHistories, historyKey, 
         chatType: dc.ctx.chatType,
         skipTyping,
         replyInThread: dc.isThread,
+        threadId: dc.isThread ? dc.ctx.threadId : undefined,
         toolUseDisplay,
     });
     // Create an AbortController so the abort fast-path can cancel the
@@ -288,9 +290,14 @@ async function dispatchToAgent(params) {
             baseSessionKey: dc.route.sessionKey,
         });
     }
-    // 2. Build annotated message body
-    const messageBody = (0, dispatch_builders_1.buildMessageBody)(params.ctx, params.quotedContent);
-    // 3. Permission-error notification (optional side-effect).
+    // Consume any pending mention sentinels for this thread. Take and
+    // delete is one shot per inbound — capture once, hand to both body
+    // builders below.
+    const sentinelKey = (0, chat_queue_1.threadScopedKey)(dc.ctx.chatId, dc.isThread ? dc.ctx.threadId : undefined);
+    const sentinels = (0, sentinel_store_1.getSentinelStore)(dc.account.accountId).consumeSentinels(sentinelKey);
+    // 3. Build annotated message body
+    const messageBody = (0, dispatch_builders_1.buildMessageBody)(params.ctx, params.quotedContent, sentinels);
+    // 4. Permission-error notification (optional side-effect).
     //    Isolated so a failure here does not block the main message dispatch.
     //    Skipped for comment targets: the streaming card dispatcher inside
     //    dispatchPermissionNotification sends via IM APIs which don't
@@ -303,13 +310,13 @@ async function dispatchToAgent(params) {
             dc.error(`feishu[${dc.account.accountId}]: permission notification failed, continuing: ${String(err)}`);
         }
     }
-    // 4. Build main envelope (with group chat history)
+    // 5. Build main envelope (with group chat history)
     const { combinedBody, historyKey } = (0, dispatch_builders_1.buildEnvelopeWithHistory)(dc, messageBody, params.chatHistories, params.historyLimit);
-    // 5. Build BodyForAgent with mention annotation (if any).
+    // 6. Build BodyForAgent with mention annotation (if any).
     //    SDK >= 2026.2.10 no longer falls back to Body for BodyForAgent,
     //    so we must set it explicitly to preserve the annotation.
-    const bodyForAgent = (0, dispatch_builders_1.buildBodyForAgent)(params.ctx);
-    // 6. Build InboundHistory for SDK metadata injection (>= 2026.2.10).
+    const bodyForAgent = (0, dispatch_builders_1.buildBodyForAgent)(params.ctx, sentinels);
+    // 7. Build InboundHistory for SDK metadata injection (>= 2026.2.10).
     //    The SDK's buildInboundUserContextPrefix renders these as structured
     //    JSON blocks; earlier SDK versions simply ignore unknown fields.
     const threadHistoryKey = (0, chat_queue_1.threadScopedKey)(dc.ctx.chatId, dc.isThread ? dc.ctx.threadId : undefined);
@@ -320,7 +327,7 @@ async function dispatchToAgent(params) {
             timestamp: entry.timestamp ?? Date.now(),
         }))
         : undefined;
-    // 7. Build inbound context payload
+    // 8. Build inbound context payload
     const isBareNewOrReset = /^\/(?:new|reset)\s*$/i.test((params.ctx.content ?? '').trim());
     const groupSystemPrompt = dc.isGroup
         ? params.groupConfig?.systemPrompt?.trim() || params.defaultGroupConfig?.systemPrompt?.trim() || undefined
@@ -357,7 +364,7 @@ async function dispatchToAgent(params) {
             ...(dc.ctx.threadId ? { MessageThreadId: dc.ctx.threadId } : {}),
         },
     });
-    // 8a. Intercept /feishu commands for i18n multi-locale card dispatch
+    // 9a. Intercept /feishu commands for i18n multi-locale card dispatch
     //     Must run BEFORE the SDK command check — the SDK does not recognise
     //     plugin-registered commands via isControlCommandMessage, so
     //     /feishu_* falls through to the AI agent otherwise.
