@@ -29,6 +29,7 @@ function resolveFeishuSendContext(params) {
         to: routeTarget.target,
         replyToMessageId,
         replyInThread,
+        threadId: explicitThreadId,
         accountId: params.accountId ?? undefined,
     };
 }
@@ -80,12 +81,19 @@ exports.feishuOutbound = {
         }
         const ctx = resolveFeishuSendContext({ cfg, to, accountId, replyToId, threadId });
         // Feishu media messages do not support inline captions — send text first.
+        // Capture the result so the no-mediaUrl path can return it without re-sending.
+        let captionResult;
         if (text?.trim()) {
-            await (0, deliver_1.sendTextLark)({ ...ctx, to: ctx.to, text });
+            captionResult = await (0, deliver_1.sendTextLark)({ ...ctx, to: ctx.to, text });
         }
-        // No mediaUrl — text-only fallback.
+        // No mediaUrl — text-only flow.
         if (!mediaUrl) {
             log.info('sendMedia: no mediaUrl provided, falling back to text-only');
+            if (captionResult) {
+                // Caption was already sent above; return that result.
+                return { channel: 'feishu', ...captionResult };
+            }
+            // No caption text — send empty/raw text to satisfy the contract.
             const result = await (0, deliver_1.sendTextLark)({ ...ctx, to: ctx.to, text: text ?? '' });
             return { channel: 'feishu', ...result };
         }

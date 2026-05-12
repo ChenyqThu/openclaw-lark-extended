@@ -17,6 +17,8 @@ exports.getUserNameCache = exports.clearUserNameCache = exports.UserNameCache = 
 exports.batchResolveUserNames = batchResolveUserNames;
 exports.createBatchResolveNames = createBatchResolveNames;
 exports.resolveBotName = resolveBotName;
+exports.prefetchChatBots = prefetchChatBots;
+exports.prefetchChatMembers = prefetchChatMembers;
 exports.resolveUserName = resolveUserName;
 const lark_client_1 = require("../../core/lark-client.js");
 const user_name_cache_store_1 = require("./user-name-cache-store.js");
@@ -72,32 +74,29 @@ async function batchResolveUserNames(params) {
                 if (!openId)
                     continue;
                 const name = item.name || item.display_name || item.nickname || item.en_name || '';
-                // Safe-set rule (Phase 0 invariant, formerly only enforced on the
-                // UAT side): never overwrite a real cached name with the '' sentinel.
-                // TAT users/batch frequently returns entries with empty name fields
-                // (per the doc comment at top of this file), so writing them via
-                // raw cache.set was poisoning UAT-resolved real names — Jarvis
-                // post-Phase-4 traced reactions' operator_name=null to exactly
-                // this path. Real names always win; sentinels only fill gaps.
+                // Safe-set rule (fork f3f9b45): never overwrite a real cached name
+                // with the '' sentinel. TAT users/batch frequently returns entries
+                // with empty name fields (per the doc comment at top of this file),
+                // so writing them via raw setWithKind was poisoning UAT-resolved real
+                // names — Jarvis post-Phase-4 traced reactions' operator_name=null to
+                // exactly this path. Real names always win; sentinels only fill gaps.
                 if (name) {
-                    cache.set(openId, name);
+                    cache.setWithKind(openId, name, 'user');
                     result.set(openId, name);
                 }
-                else {
-                    if (!cache.has(openId)) {
-                        cache.set(openId, '');
-                        result.set(openId, '');
-                    }
+                else if (!cache.has(openId)) {
+                    cache.setWithKind(openId, '', 'user');
+                    result.set(openId, '');
                 }
                 resolved.add(openId);
             }
             // Sentinel ambiguously-missing IDs only when the response itself was
-            // non-empty (i.e. the API call worked). Empty users.length is treated
-            // as transient/permission failure — let the next call retry.
+            // non-empty (i.e. the API call worked). Empty items.length is treated
+            // as transient/permission failure — let the next call retry. (fork f3f9b45)
             if (items.length > 0) {
                 for (const id of chunk) {
                     if (!resolved.has(id) && !cache.has(id)) {
-                        cache.set(id, '');
+                        cache.setWithKind(id, '', 'user');
                         result.set(id, '');
                     }
                 }
@@ -147,7 +146,7 @@ async function resolveBotName(params) {
         const name = bot?.name || bot?.i18n_names?.zh_cn || bot?.i18n_names?.en_us || '';
         // Cache even empty names to avoid repeated API calls for bots
         // whose names we cannot resolve.
-        cache.set(openId, name);
+        cache.setWithKind(openId, name, 'bot');
         return { name: name || undefined };
     }
     catch (err) {
@@ -161,9 +160,123 @@ async function resolveBotName(params) {
         else {
             log(`feishu: failed to resolve bot name for ${openId}: ${String(err)}`);
         }
-        cache.set(openId, '');
+        cache.setWithKind(openId, '', 'bot');
         return {};
     }
+}
+// ---------------------------------------------------------------------------
+// Lazy chat-member prefetch
+// ---------------------------------------------------------------------------
+/** Returns the numeric Feishu API error code from a thrown error, or null. */
+function extractApiCode(err) {
+    const permErr = (0, permission_1.extractPermissionError)(err);
+    if (typeof permErr?.code === 'number')
+        return permErr.code;
+    if (err && typeof err === 'object') {
+        const code = err.response?.data?.code;
+        if (typeof code === 'number')
+            return code;
+    }
+    return null;
+}
+/**
+ * Runs a chat-member prefetch with shared lifecycle:
+ *
+ * 1. Skip on unconfigured account or empty chatId.
+ * 2. Dedup concurrent calls per (tag, chatId) via `cache.inFlight`.
+ * 3. Skip when an in-TTL snapshot already exists.
+ * 4. On API error, cache an empty list to short-circuit retries; on
+ *    transient errors, leave the cache untouched so the next call retries.
+ */
+async function runChatPrefetch(spec, account, chatId, log) {
+    if (!account.configured || !chatId)
+        return;
+    const cache = (0, user_name_cache_store_1.getUserNameCache)(account.accountId);
+    const key = `${spec.tag}:${chatId}`;
+    const existing = cache.getInflight(key);
+    if (existing)
+        return existing;
+    if (spec.isFresh(cache, chatId))
+        return;
+    const promise = (async () => {
+        try {
+            const client = lark_client_1.LarkClient.fromAccount(account).sdk;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const res = await client.request({
+                method: 'GET',
+                url: spec.url(chatId),
+                params: spec.params,
+            });
+            const items = res?.data?.items ?? [];
+            const members = items.map(spec.parseItem).filter((m) => m !== null);
+            spec.record(cache, chatId, members);
+        }
+        catch (err) {
+            const apiCode = extractApiCode(err);
+            if (apiCode != null) {
+                // Application-level refusal: cache an empty list to short-circuit
+                // further retries. Persistent errors (e.g. missing scope) will not
+                // resolve within the cache TTL anyway.
+                log(`prefetchChat${spec.tag}[${chatId}]: API error code=${apiCode}, caching empty`);
+                spec.record(cache, chatId, []);
+            }
+            else {
+                log(`prefetchChat${spec.tag}[${chatId}]: failed: ${String(err)}`);
+            }
+        }
+        finally {
+            cache.clearInflight(key);
+        }
+    })();
+    cache.setInflight(key, promise);
+    return promise;
+}
+const CHAT_BOTS_SPEC = {
+    tag: 'Bots',
+    url: (chatId) => `/open-apis/im/v1/chats/${chatId}/members/bots`,
+    params: {},
+    parseItem: (raw) => {
+        const it = raw;
+        const openId = String(it.bot_id ?? it.open_id ?? '');
+        if (!openId)
+            return null;
+        return { openId, name: String(it.bot_name ?? it.name ?? '') };
+    },
+    isFresh: (cache, chatId) => cache.getChatBots(chatId) !== null,
+    record: (cache, chatId, members) => cache.recordChatBots(chatId, members),
+};
+function memberTypeToKind(type) {
+    return type === 'app' ? 'bot' : 'user';
+}
+const CHAT_MEMBERS_SPEC = {
+    tag: 'Members',
+    url: (chatId) => `/open-apis/im/v1/chats/${chatId}/members`,
+    params: { member_id_type: 'open_id', page_size: 100 },
+    parseItem: (raw) => {
+        const it = raw;
+        const openId = String(it.member_id ?? it.open_id ?? '');
+        if (!openId)
+            return null;
+        return { openId, name: String(it.name ?? ''), kind: memberTypeToKind(it.member_type) };
+    },
+    isFresh: (cache, chatId) => cache.getChatMembers(chatId) !== null,
+    record: (cache, chatId, members) => cache.recordChatMembers(chatId, members),
+};
+/**
+ * Fetches the bot members of a chat via
+ * `GET /open-apis/im/v1/chats/{chat_id}/members/bots` and writes them
+ * to the per-account cache.
+ */
+async function prefetchChatBots(account, chatId, log) {
+    return runChatPrefetch(CHAT_BOTS_SPEC, account, chatId, log);
+}
+/**
+ * Fetches the human members of a chat via
+ * `GET /open-apis/im/v1/chats/{chat_id}/members` and writes them to
+ * the per-account cache.
+ */
+async function prefetchChatMembers(account, chatId, log) {
+    return runChatPrefetch(CHAT_MEMBERS_SPEC, account, chatId, log);
 }
 /**
  * Resolve a single user's display name.
@@ -192,7 +305,7 @@ async function resolveUserName(params) {
             '';
         // Cache even empty names to avoid repeated API calls for users
         // whose names we cannot resolve (e.g. due to permissions).
-        cache.set(openId, name);
+        cache.setWithKind(openId, name, 'user');
         return { name: name || undefined };
     }
     catch (err) {
@@ -200,7 +313,7 @@ async function resolveUserName(params) {
         if (permErr) {
             log(`feishu: permission error resolving user name: code=${permErr.code}`);
             // Cache empty name so we don't retry a known-failing openId
-            cache.set(openId, '');
+            cache.setWithKind(openId, '', 'user');
             return { permissionError: permErr };
         }
         log(`feishu: failed to resolve user name for ${openId}: ${String(err)}`);
