@@ -3,12 +3,12 @@
 Snapshot of the fork's current state. Updated when productionization phases
 complete or live deployment changes.
 
-Last updated: **2026-05-07** (after 0.2.0 name-resolver refactor cutover)
+Last updated: **2026-05-12** (after 0.2.1 baseline absorb of `@larksuite/openclaw-lark@2026.5.12`)
 
 ## TL;DR
 
-- Fork version: **0.2.0** (substantial release; see CHANGELOG)
-- Upstream baseline: **`@larksuite/openclaw-lark@2026.5.7`** (in sync with npm latest)
+- Fork version: **0.2.1** (baseline absorb; see CHANGELOG)
+- Upstream baseline: **`@larksuite/openclaw-lark@2026.5.12`** (in sync with npm latest)
 - Distribution: **internal team share** via private GitHub repo
   [`ChenyqThu/openclaw-lark-extended`](https://github.com/ChenyqThu/openclaw-lark-extended);
   npm publish not yet
@@ -21,8 +21,8 @@ Last updated: **2026-05-07** (after 0.2.0 name-resolver refactor cutover)
 | Branch | Tip | Purpose |
 |---|---|---|
 | `main` | `6cfe5d1` | Public-ready productionized fork. No private deployment data. |
-| `lucien/main` | `9770e72` | Live deployment branch. `main` + private overlay (deploy/rollback/drift/upstream-watch scripts, `DEPLOY.md`, `MIGRATION.lucien.md`, private spinner phrase pools). |
-| `upstream/main` | `46dfbb1` | Force-rebaselined `npm pack @larksuite/openclaw-lark@2026.5.7`. |
+| `lucien/main` | `2912767d` | Live deployment branch. `main` + private overlay (deploy/rollback/drift/upstream-watch scripts, `DEPLOY.md`, `MIGRATION.lucien.md`, private spinner phrase pools). |
+| `upstream/main` | `c1a84617` | Force-rebaselined `npm pack @larksuite/openclaw-lark@2026.5.12`. |
 
 Tags:
 - `lucien-main-pre-productionization-v1` → `1aa2628`
@@ -75,7 +75,8 @@ tail -f /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log        # live log
 
 ## Backups (rollback targets)
 
-- Live tree: `~/.openclaw/openclaw-lark.bak-20260507T133125`
+- Live tree: `~/.openclaw/openclaw-lark.bak-20260512T104615` (2026.5.12 cutover)
+- Live tree: `~/.openclaw/openclaw-lark.bak-20260507T133125` (0.2.0 cutover)
 - Config: `~/.openclaw/openclaw.json.bak-prod-cutover-20260507T132834`
 
 `bash scripts/rollback.sh` restores the most recent live-tree backup and
@@ -99,6 +100,22 @@ restarts the gateway.
 
 ## Recently completed
 
+- 2026-05-12 — **0.2.1 baseline absorb of `@larksuite/openclaw-lark@2026.5.12`**
+  (merge commit `ea8aa097` on feature/upstream-2026.5.12 → `2912767d` on
+  lucien/main). Net upstream additions: PR #486 outbound @mention
+  normalization (new `normalize-mentions.{js,d.ts}` + `sentinel-store.{js,d.ts}` +
+  `setWithKind` kind-annotated UserNameCache) and PR #495 empty-msg guard +
+  media 502/503/504 retry. Three conflict files resolved preserving all
+  fork patches: dispatch-builders.js unified into single `[System: ...]`
+  block with three section formatters (mention list + sentinel hint +
+  wasMentioned directive); dispatch.js threads `{ wasMentioned, sentinels }`
+  combined opts to body builders; user-name-cache.js retains fork
+  `f3f9b45` safe-set + items.length transient-failure guard adapted to
+  upstream `setWithKind` API. Vitest 105/105 green. Live cutover backup
+  `~/.openclaw/openclaw-lark.bak-20260512T104615`. Bot-to-bot @-mention
+  (upstream PR #477) was already in 5.7 baseline — fork's wasMentioned
+  prompt-directive is complementary (gating vs prompting axis), preserved
+  after merge.
 - 2026-05-07 — **0.2.0 name-resolver refactor + unified message tool**
   (commits `659f7e1` Phase 0 → `f3f9b45` final hotfix on lucien/main, 11
   commits total). Fixes the long-standing 张冠李戴 bug in group context
