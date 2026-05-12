@@ -21,42 +21,68 @@ const mention_1 = require("./mention.js");
 // ---------------------------------------------------------------------------
 // Mention annotation
 // ---------------------------------------------------------------------------
+const MENTION_USAGE_HINT = 'To @mention in a reply, use `<at user_id="ou_xxx">Name</at>`; plain "@Name" won\'t notify.';
 /**
  * Build a `[System: ...]` mention annotation for the message.
  *
- * Two independent fragments may be emitted:
+ * Up to three independent sections may be emitted, joined into one
+ * bracketed system note:
  *
- *   1. A list of non-bot @-mentioned users (with open_ids), to teach the
- *      LLM how to @-tag them in a reply.
- *   2. An explicit "you were @-mentioned, you MUST respond" directive,
- *      emitted when `opts.wasMentioned` is true. This compensates for
- *      `stripBotMentions` removing the bot's own @tag from the body and
- *      `nonBotMentions` filtering it out of the list above — without
- *      this, the LLM sees no signal it was addressed and may pick
- *      NO_REPLY (especially in group chats with multiple @-tagged bots).
+ *   1. List of non-bot @-mentioned users (with open_ids), so the LLM
+ *      knows who was @-tagged and how to @-tag them back.
+ *   2. Sentinel feedback from upstream PR #486 — when the previous
+ *      outbound reply had unresolved `@Name` mentions (not_found /
+ *      ambiguous), surface that hint so the next reply can disambiguate.
+ *   3. wasMentioned directive (fork) — when `opts.wasMentioned` is true,
+ *      emit "you MUST respond" so the LLM doesn't pick NO_REPLY after
+ *      `stripBotMentions` removed the bot's own @tag and `nonBotMentions`
+ *      filtered it out of section 1 (especially in multi-bot groups).
  *
  * `wasMentioned` is the same boolean that flows into the SDK's
  * `WasMentioned` field — computed once in dispatch.js so the @all branch
  * (and any future broadening of the rule) applies here automatically.
  *
- * Returns `undefined` when neither fragment is needed. Sender identity /
- * chat metadata are handled by the SDK's own
- * `buildInboundUserContextPrefix` and are not duplicated here.
+ * Returns `undefined` when no section is needed. Sender identity / chat
+ * metadata are handled by the SDK's own `buildInboundUserContextPrefix`
+ * and are not duplicated here.
  */
 function buildMentionAnnotation(ctx, opts) {
-    const wasMentioned = opts?.wasMentioned === true;
-    const mentions = (0, mention_1.nonBotMentions)(ctx);
-    if (mentions.length === 0 && !wasMentioned)
+    const sections = [
+        formatMentionList((0, mention_1.nonBotMentions)(ctx)),
+        formatSentinelFeedback(opts?.sentinels),
+        formatWasMentionedDirective(opts?.wasMentioned),
+    ].filter((s) => !!s);
+    if (sections.length === 0)
         return undefined;
-    const parts = [];
-    if (mentions.length > 0) {
-        const mentionDetails = mentions.map((t) => `${t.name} (open_id: ${t.openId})`).join(', ');
-        parts.push(`[System: This message @mentions the following users: ${mentionDetails}. Use these open_ids when performing actions involving these users. To @mention in a reply, use \`<at user_id="ou_xxx">Name</at>\`; plain "@Name" won't notify.]`);
-    }
-    if (wasMentioned) {
-        parts.push(`[System: You were explicitly @-mentioned in this message. You MUST respond — do NOT output NO_REPLY.]`);
-    }
-    return parts.join('\n');
+    sections.push(MENTION_USAGE_HINT);
+    return `[System: ${sections.join(' ')}]`;
+}
+function formatMentionList(mentions) {
+    if (mentions.length === 0)
+        return undefined;
+    const details = mentions.map((t) => `${t.name} (open_id: ${t.openId})`).join(', ');
+    return (`This message @mentions the following users: ${details}. ` +
+        `Use these open_ids when performing actions involving these users.`);
+}
+function formatSentinelFeedback(sentinels) {
+    if (!sentinels || sentinels.length === 0)
+        return undefined;
+    const lines = sentinels.map((s) => {
+        if (s.reason === 'not_found') {
+            return `"@${s.name}" was not recognized in the chat`;
+        }
+        if (s.reason === 'ambiguous' && s.candidates && s.candidates.length > 0) {
+            const ids = s.candidates.map((c) => c.openId).join(' / ');
+            return `"@${s.name}" matched multiple users (${ids}); use explicit <at user_id="...">`;
+        }
+        return `"@${s.name}" failed to resolve`;
+    });
+    return `Previous reply had unresolved mentions: ${lines.join('; ')}.`;
+}
+function formatWasMentionedDirective(wasMentioned) {
+    if (wasMentioned !== true)
+        return undefined;
+    return `You were explicitly @-mentioned in this message. You MUST respond — do NOT output NO_REPLY.`;
 }
 // ---------------------------------------------------------------------------
 // Message body builders

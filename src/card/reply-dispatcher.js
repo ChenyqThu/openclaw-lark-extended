@@ -33,7 +33,7 @@ const log = (0, lark_logger_1.larkLogger)('card/reply-dispatcher');
 // ---------------------------------------------------------------------------
 function createFeishuReplyDispatcher(params) {
     const core = lark_client_1.LarkClient.runtime;
-    const { cfg, agentId, chatId, sessionKey, replyToMessageId, accountId, replyInThread } = params;
+    const { cfg, agentId, chatId, sessionKey, replyToMessageId, accountId, replyInThread, threadId } = params;
     // Resolve account so we can read per-account config (e.g. replyMode)
     const account = (0, accounts_1.getLarkAccount)(cfg, accountId);
     const feishuCfg = account.config;
@@ -243,6 +243,7 @@ function createFeishuReplyDispatcher(params) {
                                     replyToMessageId,
                                     replyInThread,
                                     accountId,
+                                    threadId,
                                 });
                             }
                             catch (fallbackErr) {
@@ -277,6 +278,7 @@ function createFeishuReplyDispatcher(params) {
                                         replyToMessageId,
                                         replyInThread,
                                         accountId,
+                                        threadId,
                                     });
                                 }
                                 catch (fallbackErr) {
@@ -306,6 +308,7 @@ function createFeishuReplyDispatcher(params) {
                                 replyToMessageId,
                                 replyInThread,
                                 accountId,
+                                threadId,
                             });
                         }
                         catch (err) {
