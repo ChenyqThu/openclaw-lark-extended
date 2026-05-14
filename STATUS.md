@@ -20,7 +20,7 @@ Last updated: **2026-05-14** (after 0.2.2 baseline absorb of `@larksuite/opencla
 
 | Branch | Tip | Purpose |
 |---|---|---|
-| `main` | (to be updated) | Public-ready productionized fork. No private deployment data. |
+| `main` | `54dac0f4` | Public-ready productionized fork. No private deployment data. |
 | `lucien/main` | `179d7f99` | Live deployment branch. `main` + private overlay (deploy/rollback/drift/upstream-watch scripts, `DEPLOY.md`, `MIGRATION.lucien.md`, private spinner phrase pools). |
 | `upstream/main` | `53be3034` | Force-rebaselined `npm pack @larksuite/openclaw-lark@2026.5.13`. |
 
