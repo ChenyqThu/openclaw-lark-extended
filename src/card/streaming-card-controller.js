@@ -107,7 +107,7 @@ class StreamingCardController {
             const candidateKeys = fallbackKey !== key ? [key, fallbackKey] : [key];
             const sessionApi = runtime.agent?.session;
             if (sessionApi?.resolveStorePath && sessionApi?.loadSessionStore) {
-                const storePath = sessionApi.resolveStorePath(sessionStorePath);
+                const storePath = sessionApi.resolveStorePath(sessionStorePath, { agentId: this.deps.agentId });
                 const store = sessionApi.loadSessionStore(storePath);
                 let entry;
                 let matchedKey;
@@ -150,7 +150,7 @@ class StreamingCardController {
             if (!channelSession?.resolveStorePath) {
                 return undefined;
             }
-            const storePath = channelSession.resolveStorePath(sessionStorePath);
+            const storePath = channelSession.resolveStorePath(sessionStorePath, { agentId: this.deps.agentId });
             const raw = await (0, promises_1.readFile)(storePath, 'utf8');
             const parsed = JSON.parse(raw);
             const store = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
