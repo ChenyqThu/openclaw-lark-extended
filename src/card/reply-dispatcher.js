@@ -78,6 +78,7 @@ function createFeishuReplyDispatcher(params) {
     const controller = useStreamingCards
         ? new streaming_card_controller_1.StreamingCardController({
             cfg,
+            agentId,
             sessionKey,
             accountId,
             chatId,
