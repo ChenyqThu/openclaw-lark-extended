@@ -3,26 +3,26 @@
 Snapshot of the fork's current state. Updated when productionization phases
 complete or live deployment changes.
 
-Last updated: **2026-05-12** (after 0.2.1 baseline absorb of `@larksuite/openclaw-lark@2026.5.12`)
+Last updated: **2026-05-14** (after 0.2.2 baseline absorb of `@larksuite/openclaw-lark@2026.5.13` — Patch 4b retired)
 
 ## TL;DR
 
-- Fork version: **0.2.1** (baseline absorb; see CHANGELOG)
-- Upstream baseline: **`@larksuite/openclaw-lark@2026.5.12`** (in sync with npm latest)
+- Fork version: **0.2.2** (baseline absorb; Patch 4b retired — see CHANGELOG)
+- Upstream baseline: **`@larksuite/openclaw-lark@2026.5.13`** (in sync with npm latest)
 - Distribution: **internal team share** via private GitHub repo
   [`ChenyqThu/openclaw-lark-extended`](https://github.com/ChenyqThu/openclaw-lark-extended);
   npm publish not yet
 - Live deployment: ✅ running on the maintainer's mac-mini gateway, gateway
-  active on 127.0.0.1:18789, drift-check ✓ no drift after 2026-05-07
-  19:06 PDT cutover. Pre-existing 0.1.0 ↔ 0.1.1 cosmetic drift cleared.
+  active on 127.0.0.1:18789, drift-check ✓ no drift after 2026-05-14
+  14:59 PDT cutover (Jarvis-led). Live tree contents match `lucien/main` HEAD.
 
 ## Branches
 
 | Branch | Tip | Purpose |
 |---|---|---|
-| `main` | `6cfe5d1` | Public-ready productionized fork. No private deployment data. |
-| `lucien/main` | `2912767d` | Live deployment branch. `main` + private overlay (deploy/rollback/drift/upstream-watch scripts, `DEPLOY.md`, `MIGRATION.lucien.md`, private spinner phrase pools). |
-| `upstream/main` | `c1a84617` | Force-rebaselined `npm pack @larksuite/openclaw-lark@2026.5.12`. |
+| `main` | (to be updated) | Public-ready productionized fork. No private deployment data. |
+| `lucien/main` | `179d7f99` | Live deployment branch. `main` + private overlay (deploy/rollback/drift/upstream-watch scripts, `DEPLOY.md`, `MIGRATION.lucien.md`, private spinner phrase pools). |
+| `upstream/main` | `53be3034` | Force-rebaselined `npm pack @larksuite/openclaw-lark@2026.5.13`. |
 
 Tags:
 - `lucien-main-pre-productionization-v1` → `1aa2628`
@@ -75,6 +75,7 @@ tail -f /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log        # live log
 
 ## Backups (rollback targets)
 
+- Live tree: `~/.openclaw/openclaw-lark.bak-20260514T145949` (2026.5.13 cutover; pre-cutover state was 0.2.1 + 5.12)
 - Live tree: `~/.openclaw/openclaw-lark.bak-20260512T104615` (2026.5.12 cutover)
 - Live tree: `~/.openclaw/openclaw-lark.bak-20260507T133125` (0.2.0 cutover)
 - Config: `~/.openclaw/openclaw.json.bak-prod-cutover-20260507T132834`
@@ -100,6 +101,21 @@ restarts the gateway.
 
 ## Recently completed
 
+- 2026-05-14 — **0.2.2 baseline absorb of `@larksuite/openclaw-lark@2026.5.13`**
+  (Jarvis-led; rewritten clean on take-over to drop accidentally-committed
+  `node_modules/` + `.omc/`). Net upstream delta: new `secret-contract-api.{js,d.ts}`
+  (Plugin Secret Contract API, fork does not consume yet), `peerDependencies.openclaw`
+  bump `>=2026.3.22` → `>=2026.5.4`, `agentId` threaded through `StreamingCardDeps`,
+  `vc-meeting-invited-handler.js` synthetic prompt phrased more directively, minor
+  `tsdown.config.js` tweak. **Patch 4b retired** — upstream's
+  `resolveStorePath(path, { agentId })` overload replaces the fork's regex-based
+  `/agents/main/` → `/agents/<id>/` rewrite; both call-sites now use the DI signature.
+  `scripts/smoke.sh` narrowed from 5-patch checks to 4. Vitest 105/105 green. Live
+  cutover backup `~/.openclaw/openclaw-lark.bak-20260514T145949`; drift-check ✓ no
+  drift. Note: a separate 0.2.2 "interactive card mention injection" feature attempt
+  was rolled back before this absorb and is preserved only in branch
+  `lucien-0.2.2-orphan-feature` for historical reference; the 0.2.2 number is reused
+  here for the baseline absorb.
 - 2026-05-12 — **0.2.1 baseline absorb of `@larksuite/openclaw-lark@2026.5.12`**
   (merge commit `ea8aa097` on feature/upstream-2026.5.12 → `2912767d` on
   lucien/main). Net upstream additions: PR #486 outbound @mention

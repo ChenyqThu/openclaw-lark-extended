@@ -65,7 +65,7 @@ Post-deploy live validation (canary order: low blast radius first):
 
 ```bash
 # 9. DM Jarvis: receives a streaming reply. Confirm:
-#    - footer shows model + tokens (Patch 4b live)
+#    - footer shows model + tokens (upstream resolveStorePath with agentId DI)
 #    - typing emoji animates from your configured pool (Patch 7 live)
 #    - spinner phrase rotates from channels.feishu.spinnerPhrases (Patch 5b live)
 
@@ -108,10 +108,10 @@ git add . && git commit -m "upstream: @larksuite/openclaw-lark@$LATEST"
 
 git checkout -b feature/upstream-$LATEST lucien/main
 git merge upstream/main
-# ↑ resolve conflicts in the 5 patch hot-zones:
+# ↑ resolve conflicts in the 4 remaining patch hot-zones (Patch 4b retired
+# in 2026.5.13: upstream's resolveStorePath now accepts { agentId } DI):
 #   src/channel/event-handlers.js          (Patch 1)
 #   src/messaging/inbound/dispatch-context.js (Patch 2)
-#   src/card/streaming-card-controller.js  (Patch 4b + 5b)
 #   src/card/builder.js                    (Patch 5b)
 #   src/messaging/outbound/typing.js       (Patch 7)
 # Plus possibly:
