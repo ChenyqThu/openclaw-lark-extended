@@ -12,6 +12,7 @@ import type { HistoryEntry } from 'openclaw/plugin-sdk/reply-history';
 import type { MessageContext } from '../types';
 import type { LarkClient } from '../../core/lark-client';
 import type { DispatchContext } from './dispatch-context';
+import type { SentinelEntry } from './sentinel-store';
 /**
  * Options shared by the body-building functions.
  *
@@ -19,20 +20,25 @@ import type { DispatchContext } from './dispatch-context';
  * bot was @-mentioned (or @all-mentioned per group config). Computed
  * once in dispatch.js and threaded through here so the annotation,
  * Body, and BodyForAgent all see the same value.
+ *
+ * `sentinels` are unresolved-mention feedback entries from the previous
+ * outbound reply (upstream PR #486), consumed once per inbound and
+ * surfaced in the mention annotation.
  */
 export interface BuildBodyOpts {
     wasMentioned?: boolean;
+    sentinels?: SentinelEntry[];
 }
 /**
- * Build a `[System: ...]` mention annotation. May emit two fragments:
- * a list of non-bot @-mentioned users, and an explicit "you MUST
- * respond" directive when `opts.wasMentioned` is true. The latter
- * compensates for the bot's own @tag being stripped from both the body
- * and the user-mention list.
+ * Build a `[System: ...]` mention annotation. May emit up to three
+ * fragments inside a single bracketed system note:
+ *   1. a list of non-bot @-mentioned users,
+ *   2. sentinel feedback for the previous reply's unresolved mentions,
+ *   3. a "you MUST respond" directive when `opts.wasMentioned` is true.
  *
- * Returns `undefined` when neither fragment is needed. Sender identity
- * / chat metadata are handled by the SDK's own
- * `buildInboundUserContextPrefix` and are not duplicated here.
+ * Returns `undefined` when no fragment is needed. Sender identity / chat
+ * metadata are handled by the SDK's own `buildInboundUserContextPrefix`
+ * and are not duplicated here.
  */
 export declare function buildMentionAnnotation(ctx: MessageContext, opts?: BuildBodyOpts): string | undefined;
 /**

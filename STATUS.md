@@ -1,87 +1,63 @@
 # Project status
 
 Snapshot of the fork's current state. Updated when productionization phases
-complete or live deployment changes.
+complete or new upstream baselines are absorbed.
 
-Last updated: **2026-05-07** (after 0.2.0 name-resolver refactor cutover)
+Last updated: **2026-05-14** (after 0.2.2 baseline absorb of `@larksuite/openclaw-lark@2026.5.13` — Patch 4b retired)
 
 ## TL;DR
 
-- Fork version: **0.2.0** (substantial release; see CHANGELOG)
-- Upstream baseline: **`@larksuite/openclaw-lark@2026.5.7`** (in sync with npm latest)
+- Fork version: **0.2.2** (baseline absorb; Patch 4b retired — see CHANGELOG)
+- Upstream baseline: **`@larksuite/openclaw-lark@2026.5.13`** (in sync with npm latest)
 - Distribution: **internal team share** via private GitHub repo
   [`ChenyqThu/openclaw-lark-extended`](https://github.com/ChenyqThu/openclaw-lark-extended);
   npm publish not yet
-- Live deployment: ✅ running on the maintainer's mac-mini gateway, gateway
-  active on 127.0.0.1:18789, drift-check ✓ no drift after 2026-05-07
-  19:06 PDT cutover. Pre-existing 0.1.0 ↔ 0.1.1 cosmetic drift cleared.
 
 ## Branches
 
-| Branch | Tip | Purpose |
-|---|---|---|
-| `main` | `6cfe5d1` | Public-ready productionized fork. No private deployment data. |
-| `lucien/main` | `9770e72` | Live deployment branch. `main` + private overlay (deploy/rollback/drift/upstream-watch scripts, `DEPLOY.md`, `MIGRATION.lucien.md`, private spinner phrase pools). |
-| `upstream/main` | `46dfbb1` | Force-rebaselined `npm pack @larksuite/openclaw-lark@2026.5.7`. |
+| Branch | Purpose |
+|---|---|
+| `main` | Public-ready productionized fork. No private deployment data. |
+| `lucien/main` | Maintainer's deployment branch. `main` + private overlay (deploy/rollback/drift/upstream-watch scripts, `DEPLOY.md`, `MIGRATION.lucien.md`, private spinner phrase pools). |
+| `upstream/main` | Force-rebaselined `npm pack @larksuite/openclaw-lark@<version>`. |
 
 Tags:
-- `lucien-main-pre-productionization-v1` → `1aa2628`
-  (lucien/main HEAD before productionization rebase; safety anchor in case
-  we ever need to compare)
+- `v0.2.0` → 0.2.0 release marker on `main`
+- `lucien-main-pre-productionization-v1` → safety anchor on `lucien/main`
+  before productionization rebase
 
-## What's deployed live
+## Patches preserved on the fork
 
-- `~/.openclaw/extensions/openclaw-lark/` ← rsync of `lucien/main`
-  (excluding `.git`, `node_modules`, `scripts`, `test`, `examples`,
-  `MIGRATION.md`)
-- `package.json` `name` = `@lucien/openclaw-lark-extended`, version 0.1.1
-- Channel id `openclaw-lark` (unchanged from upstream — host routing key)
-- 7 plugins active in gateway: `active-memory, browser, google,
-  jarvis-skill-learner, memory-core, memory-wiki, openclaw-lark`
+The fork carries these channel-level patches (see CHANGELOG for full
+context). All are opt-in via existing config keys:
 
-### Active config keys (live `~/.openclaw/openclaw.json`)
+- **Patch 1** — non-OAuth card actions forward to the agent as a
+  synthetic message (`src/channel/event-handlers.js`)
+- **Patch 2** — per-group `replyInThread` (`src/messaging/inbound/dispatch-context.js`)
+- **Patch 5** — `randomSpinnerPhrase(cfg)` reads from
+  `channels.feishu.spinnerPhrases` (`src/card/builder.js`)
+- **Patch 7** — `getTypingEmojiType(cfg)` reads from
+  `channels.feishu.typingEmoji` with random pool support
+  (`src/messaging/outbound/typing.js`)
 
-#### Channel-level (`channels.feishu.*`)
-- `spinnerPhrases` — 39 phrases (private, kept on `lucien/main` only)
-- `typingEmoji` — `'Get,GoGoGo,HappyDragon,Yes,SLIGHT,RoarForYou,Sigh,SMART,OK,JIAYI'`
-- `groups[<chatId>].replyInThread` — per-group `'enabled'`/`'disabled'`
-
-#### Plugin-level (`plugins.entries["openclaw-lark"].config.social.*`)
-- `enabled: true` (added during cutover; required since productionization
-  made the social extension opt-in)
-- `adminDisplayName: "Lucien"`
-- `contextTemplate: <313 chars 中文 multi-bot template>` (the original
-  `本群活跃 AI Bot…` block + rule①②③④, now opt-in via this key)
-- `contextGroups: ["oc_9ba7a535e94ec2f33c53f3def70e3f2d"]`
-- `contextMessageCount: 20`, `contextCacheTtlMs: 60000`
-- `stormThreshold: 2` (tighter than the public default of 5; reflects the
-  small-group traffic profile)
-- `circuitBreakerMaxOutbound: 5`, `circuitBreakerSilenceMs: 300000`
-- `debugLog: true`
+Patch 4b (streaming card store path) was retired in 0.2.2 — upstream's
+`resolveStorePath(path, { agentId })` overload supersedes the fork's
+regex-based fixup. `agentId` is now threaded through `StreamingCardDeps`
+via DI.
 
 ## Verification commands
 
 ```bash
 # Static fork checks
 bash scripts/smoke.sh                                       # syntax + patch markers + schema lint + npm test
-bash scripts/upstream-watch.sh                              # check if npm has advanced past upstream/main
-bash scripts/drift-check.sh                                 # fork ↔ live diff (must be no-drift after deploy)
 
-# Runtime probe
+# Runtime probe (against your local gateway)
 curl -sS http://127.0.0.1:18789/                            # gateway health
 openclaw gateway status                                     # service detail
-tail -f /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log        # live log
 ```
 
-## Backups (rollback targets)
+## Open follow-ups (not blocking)
 
-- Live tree: `~/.openclaw/openclaw-lark.bak-20260507T133125`
-- Config: `~/.openclaw/openclaw.json.bak-prod-cutover-20260507T132834`
-
-`bash scripts/rollback.sh` restores the most recent live-tree backup and
-restarts the gateway.
-
-## Open follow-ups (not blocking anything live)
 - **`replay-feishu-event.mjs` is still a Phase 0 stub** — parses the
   fixture but does not invoke `handleFeishuMessage`. Implementing real
   replay requires mocking the Lark SDK; a future phase.
@@ -93,22 +69,33 @@ restarts the gateway.
 - **GitHub Actions / CI** — no CI is configured. `npm test` + `npm run
   smoke` work locally. Consider adding a workflow when the repo gets a
   remote.
-- **`usability-review.md`** is committed as a historical narrative of the
-  productionization audit. Safe to delete once team has read it; not a
-  publish-blocker since `npm publish` is not in scope.
 
 ## Recently completed
 
-- 2026-05-07 — **0.2.0 name-resolver refactor + unified message tool**
-  (commits `659f7e1` Phase 0 → `f3f9b45` final hotfix on lucien/main, 11
-  commits total). Fixes the long-standing 张冠李戴 bug in group context
-  injection. Vitest 94/94 green. Live cutover backup
-  `~/.openclaw/openclaw-lark.bak-20260507T190634`. Jarvis verification:
-  B1 timeline real-name ratio ≥95%, B2 attribution 5/5, all 7 read
-  dispatcher actions PASS. See CHANGELOG.md for full release notes.
-- 2026-05-07 — productionization phases 1–8 + b-path rebase + live cutover
-  + `replyInThread: 'disabled'` schema hotfix (commits `fa118db…0b4b583`
-  on main; rebased and overlaid on `lucien/main` as `f56f3ca`; hotfix
-  `9770e72`).
-- 2026-05-07 — upstream `2026.4.10 → 2026.5.7` absorb merge (`1aa2628`
-  on lucien/main).
+- 2026-05-14 — **0.2.2 baseline absorb of `@larksuite/openclaw-lark@2026.5.13`**.
+  Net upstream delta: new `secret-contract-api.{js,d.ts}` (Plugin Secret
+  Contract API, fork does not consume yet), `peerDependencies.openclaw`
+  bump `>=2026.3.22` → `>=2026.5.4`, `agentId` threaded through
+  `StreamingCardDeps`, `vc-meeting-invited-handler.js` synthetic prompt
+  phrased more directively, minor `tsdown.config.js` tweak. **Patch 4b
+  retired** — upstream's `resolveStorePath(path, { agentId })` overload
+  replaces the fork's regex-based `/agents/main/` → `/agents/<id>/`
+  rewrite; both call-sites now use the DI signature. `scripts/smoke.sh`
+  narrowed from 5-patch checks to 4. Vitest 105/105 green.
+- 2026-05-12 — **0.2.1 baseline absorb of `@larksuite/openclaw-lark@2026.5.12`**.
+  Net upstream additions: outbound @mention normalization (new
+  `normalize-mentions.{js,d.ts}` + `sentinel-store.{js,d.ts}` +
+  `setWithKind` kind-annotated UserNameCache) and empty-msg guard +
+  media 502/503/504 retry. Three conflict files resolved preserving all
+  fork patches: dispatch-builders.js unified into single `[System: ...]`
+  block with three section formatters; dispatch.js threads
+  `{ wasMentioned, sentinels }` combined opts to body builders;
+  user-name-cache.js retains safe-set + items.length transient-failure
+  guard adapted to upstream `setWithKind` API. Vitest 105/105 green.
+- 2026-05-07 — **0.2.0 name-resolver refactor + unified message tool**.
+  Fixes the long-standing 张冠李戴 (mis-attribution) bug in group
+  context injection. Vitest 94/94 green. See CHANGELOG.md for full
+  release notes.
+- 2026-05-07 — productionization phases 1–8 + `replyInThread: 'disabled'`
+  schema hotfix (commits `fa118db…0b4b583` on `main`).
+- 2026-05-07 — upstream `2026.4.10 → 2026.5.7` absorb merge.

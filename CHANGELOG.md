@@ -3,6 +3,60 @@
 Release history for `@lucien/openclaw-lark-extended`. Tracks fork-side
 versions; the upstream baseline at each release is noted in parentheses.
 
+## 0.2.2 — baseline absorb of `@larksuite/openclaw-lark@2026.5.13`
+
+Upstream baseline-only release. No fork-side features or fixes; the only
+material change is that **Patch 4b is retired** because upstream now owns
+the streaming-card store-path fix natively.
+
+### Patch 4b retired (absorbed upstream)
+
+The fork's regex-based fixup in
+`src/card/streaming-card-controller.js` —
+
+```js
+// before (Patch 4b, fork)
+let storePath = sessionApi.resolveStorePath(sessionStorePath);
+const agentIdMatch = key.match(/^agent:([^:]+):/);
+if (agentIdMatch && storePath.includes('/agents/main/')) {
+    storePath = storePath.replace('/agents/main/', `/agents/${agentIdMatch[1]}/`);
+}
+```
+
+— is replaced by upstream's `resolveStorePath(path, { agentId })` overload.
+The fork now threads `agentId` through `StreamingCardDeps` from
+`reply-dispatcher.js` and passes it via DI:
+
+```js
+// after (upstream native, 2026.5.13)
+const storePath = sessionApi.resolveStorePath(sessionStorePath, { agentId: this.deps.agentId });
+```
+
+Both call-sites (agent session API + channel session fallback) now use the
+same DI signature, so the fork-side `agentIdMatch` regex on the session key
+is dead code. `scripts/smoke.sh` no longer checks `Patch 4b` markers;
+`DEPLOY.md` upgrade-runbook narrows the conflict hot-zones from 5 patches
+to 4.
+
+### Other upstream additions (flow through unchanged)
+
+- New top-level `secret-contract-api.{js,d.ts}` files — Plugin Secret
+  Contract API (publish-time interface; fork does not consume it yet)
+- `package.json` `peerDependencies.openclaw` bump: `>=2026.3.22` → `>=2026.5.4`
+- `src/card/reply-dispatcher.js` + `.d.ts`: `agentId` field added to
+  `StreamingCardDeps` (DI for the absorbed Patch 4b)
+- `src/messaging/inbound/vc-meeting-invited-handler.js`: synthetic prompt
+  tightened — `Join the meeting with meeting number ${n}.` →
+  `Use the available tool to join the meeting with meeting number ${n} immediately. Do not ask for confirmation.`
+- `tsdown.config.js`: minor upstream tweak
+
+### Patches still on the fork
+
+Patches 1, 2, 5, 7 remain in place. Smoke verification updated to match
+the new 4-patch hot-zone count.
+
+---
+
 ## 0.2.0 — name-resolver refactor + unified message tool (upstream baseline `@larksuite/openclaw-lark@2026.5.7`)
 
 Substantial release. Resolves the long-standing 张冠李戴 (mis-attribution)

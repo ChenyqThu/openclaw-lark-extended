@@ -79,9 +79,12 @@ describe('buildMentionAnnotation', () => {
     expect(out).toContain('miniGG (open_id: ou_minigg)');
     expect(out).not.toContain('Jarvis (open_id:'); // bot is filtered out of the user list
     expect(out).toContain('You MUST respond');
-    // Two fragments are joined by a newline so they render as separate
-    // [System: ...] blocks in the prompt.
-    expect(out.split('\n').length).toBeGreaterThanOrEqual(2);
+    // Upstream 2026.5.12 (PR #486) refactored buildMentionAnnotation into a
+    // single bracketed [System: ...] block with multiple sections joined by
+    // spaces (mention list + sentinel hint + wasMentioned directive). Verify
+    // both fragments coexist inside ONE block, not two.
+    const blocks = out.match(/\[System:[^\]]*\]/g) ?? [];
+    expect(blocks).toHaveLength(1);
   });
 
   it('does not emit the directive when wasMentioned is false but other users were @-mentioned', () => {
