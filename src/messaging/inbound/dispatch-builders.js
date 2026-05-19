@@ -47,21 +47,38 @@ const MENTION_USAGE_HINT = 'To @mention in a reply, use `<at user_id="ou_xxx">Na
  * and are not duplicated here.
  */
 function buildMentionAnnotation(ctx, opts) {
+    const wasMentioned = opts?.wasMentioned === true;
+    // Include the self bot in the recipient roster when wasMentioned=true.
+    // Without this, multi-bot @ messages (e.g. "@Self @OtherBot") look like
+    // "@OtherBot" after stripBotMentions, and `formatMentionList` filtered
+    // self out of the visible list — leaving no body or annotation signal
+    // that THIS bot was also addressed. Adding `<name> [you, open_id: ...]`
+    // to the roster restores that signal without touching the body (so
+    // chat-history echo loop risk stays zero — history is built from the
+    // already-stripped ctx.content).
+    const selfMention = wasMentioned ? ctx.mentions.find((m) => m.isBot) : undefined;
     const sections = [
-        formatMentionList((0, mention_1.nonBotMentions)(ctx)),
+        formatMentionList((0, mention_1.nonBotMentions)(ctx), selfMention),
         formatSentinelFeedback(opts?.sentinels),
-        formatWasMentionedDirective(opts?.wasMentioned),
+        formatWasMentionedDirective(wasMentioned),
     ].filter((s) => !!s);
     if (sections.length === 0)
         return undefined;
     sections.push(MENTION_USAGE_HINT);
     return `[System: ${sections.join(' ')}]`;
 }
-function formatMentionList(mentions) {
-    if (mentions.length === 0)
+function formatMentionList(mentions, selfMention) {
+    if (mentions.length === 0 && !selfMention)
         return undefined;
-    const details = mentions.map((t) => `${t.name} (open_id: ${t.openId})`).join(', ');
-    return (`This message @mentions the following users: ${details}. ` +
+    const entries = [];
+    if (selfMention) {
+        const selfName = selfMention.name || 'me';
+        entries.push(`${selfName} [you, open_id: ${selfMention.openId}]`);
+    }
+    for (const t of mentions) {
+        entries.push(`${t.name} (open_id: ${t.openId})`);
+    }
+    return (`This message @mentions the following users: ${entries.join(', ')}. ` +
         `Use these open_ids when performing actions involving these users.`);
 }
 function formatSentinelFeedback(sentinels) {
