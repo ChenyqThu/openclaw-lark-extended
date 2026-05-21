@@ -196,12 +196,13 @@ function createFeishuReplyDispatcher(params) {
             }
             // 提取文本和媒体 URL
             const text = getVisiblePayloadText(payload);
+            const reasoningText = payload.isReasoning === true ? (payload.text ?? '') : '';
             const payloadMediaUrls = payload.mediaUrls?.length
                 ? payload.mediaUrls
                 : payload.mediaUrl
                     ? [payload.mediaUrl]
                     : [];
-            if (!text.trim() && payloadMediaUrls.length === 0) {
+            if (!text.trim() && !reasoningText.trim() && payloadMediaUrls.length === 0) {
                 log.debug('deliver: empty text and no media, skipping');
                 return;
             }
@@ -211,12 +212,17 @@ function createFeishuReplyDispatcher(params) {
                     await controller.onToolPayload(payload);
                     return;
                 }
-                if (text.trim()) {
+                const controllerText = reasoningText.trim() ? reasoningText : text;
+                if (controllerText.trim()) {
                     await controller.ensureCardCreated();
                     if (controller.isTerminated)
                         return;
                     if (controller.cardMessageId) {
-                        await controller.onDeliver({ ...payload, text });
+                        if (payload.isReasoning === true) {
+                            await controller.onReasoningStream({ ...payload, text: controllerText });
+                            return;
+                        }
+                        await controller.onDeliver({ ...payload, text: controllerText });
                         return;
                     }
                     // Card creation failed — fall through to static delivery

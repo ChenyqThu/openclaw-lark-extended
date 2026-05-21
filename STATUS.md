@@ -3,18 +3,18 @@
 Snapshot of the fork's current state. Updated when productionization phases
 complete or live deployment changes.
 
-Last updated: **2026-05-14** (after 0.2.2 baseline absorb of `@larksuite/openclaw-lark@2026.5.13` — Patch 4b retired)
+Last updated: **2026-05-21** (after 0.2.3 baseline absorb of `@larksuite/openclaw-lark@2026.5.20` — Patch 1 aligned with `resolveCardCallbackOperatorId`)
 
 ## TL;DR
 
-- Fork version: **0.2.2** (baseline absorb; Patch 4b retired — see CHANGELOG)
-- Upstream baseline: **`@larksuite/openclaw-lark@2026.5.13`** (in sync with npm latest)
+- Fork version: **0.2.3** (baseline absorb; Patch 1 Schema-2 alignment — see CHANGELOG)
+- Upstream baseline: **`@larksuite/openclaw-lark@2026.5.20`** (in sync with npm latest)
 - Distribution: **internal team share** via private GitHub repo
   [`ChenyqThu/openclaw-lark-extended`](https://github.com/ChenyqThu/openclaw-lark-extended);
   npm publish not yet
 - Live deployment: ✅ running on the maintainer's mac-mini gateway, gateway
-  active on 127.0.0.1:18789, drift-check ✓ no drift after 2026-05-14
-  14:59 PDT cutover (Jarvis-led). Live tree contents match `lucien/main` HEAD.
+  active on 127.0.0.1:18789, drift-check ✓ no drift after 2026-05-21
+  cutover. Live tree contents match `lucien/main` HEAD.
 
 ## Branches
 
@@ -22,7 +22,7 @@ Last updated: **2026-05-14** (after 0.2.2 baseline absorb of `@larksuite/opencla
 |---|---|---|
 | `main` | `54dac0f4` | Public-ready productionized fork. No private deployment data. |
 | `lucien/main` | `179d7f99` | Live deployment branch. `main` + private overlay (deploy/rollback/drift/upstream-watch scripts, `DEPLOY.md`, `MIGRATION.lucien.md`, private spinner phrase pools). |
-| `upstream/main` | `53be3034` | Force-rebaselined `npm pack @larksuite/openclaw-lark@2026.5.13`. |
+| `upstream/main` | `b3174a09` | Force-rebaselined `npm pack @larksuite/openclaw-lark@2026.5.20`. |
 
 Tags:
 - `lucien-main-pre-productionization-v1` → `1aa2628`
@@ -101,6 +101,23 @@ restarts the gateway.
 
 ## Recently completed
 
+- 2026-05-21 — **0.2.3 baseline absorb of `@larksuite/openclaw-lark@2026.5.20`**.
+  Net upstream delta: new `src/core/card-action-operator.{js,d.ts}` (Schema-2
+  card-callback identity helper), three call sites refactored to use it
+  (`interactive-dispatch.js`, `ask-user-question.js`, `auto-auth.js`),
+  `reply-dispatcher.js` gains `isReasoning` streaming branch routing to
+  `controller.onReasoningStream`, `lark-client.js` disables axios auto-proxy
+  (proxy now centralized in OpenClaw core's `global-agent`),
+  `video-chat.js` swaps emoji prefixes for labelled lines + meeting number,
+  `actions.js` send-tool gets a typebox schema steering the LLM away from
+  duplicate-finalize sends. Deps: `@larksuiteoapi/node-sdk` `^1.60.0`→`^1.64.0`
+  (lockfile 1.65.0), `@sinclair/typebox` `0.34.48`→`0.34.49`.
+  **Patch 1 opportunistically aligned** — `event-handlers.js` now reads the
+  card-callback operator id via `resolveCardCallbackOperatorId(operator)`
+  instead of `operator.open_id` directly, closing the Schema-2 gap in the
+  fork's synthetic-message path. No patch retired (all of 1, 2, 5, 7,
+  Phase 4, Phase 4-fix remain). Vitest 105/105 green. Live cutover backup
+  `~/.openclaw/openclaw-lark.bak-<timestamp>`; drift-check ✓ no drift.
 - 2026-05-14 — **0.2.2 baseline absorb of `@larksuite/openclaw-lark@2026.5.13`**
   (Jarvis-led; rewritten clean on take-over to drop accidentally-committed
   `node_modules/` + `.omc/`). Net upstream delta: new `secret-contract-api.{js,d.ts}`

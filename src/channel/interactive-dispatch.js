@@ -16,6 +16,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.dispatchFeishuPluginInteractiveHandler = dispatchFeishuPluginInteractiveHandler;
 // NOTE: This is the SDK-standard interactive pipeline.
 const plugin_runtime_1 = require("openclaw/plugin-sdk/plugin-runtime");
+const card_action_operator_1 = require("../core/card-action-operator.js");
 const lark_logger_1 = require("../core/lark-logger.js");
 const send_1 = require("../messaging/outbound/send.js");
 const log = (0, lark_logger_1.larkLogger)('channel/interactive-dispatch');
@@ -29,7 +30,7 @@ function extractBasics(data) {
         const openMessageId = ev.open_message_id ?? ev.context?.open_message_id;
         return {
             action: action.trim(),
-            senderOpenId: ev.operator?.open_id,
+            senderOpenId: (0, card_action_operator_1.resolveCardCallbackOperatorId)(ev.operator),
             openChatId,
             openMessageId,
         };
