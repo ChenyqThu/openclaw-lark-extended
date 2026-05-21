@@ -9,16 +9,16 @@ importers:
   .:
     dependencies:
       '@larksuiteoapi/node-sdk':
-        specifier: ^1.60.0
-        version: 1.62.1
+        specifier: ^1.64.0
+        version: 1.65.0
       '@sinclair/typebox':
-        specifier: 0.34.48
-        version: 0.34.48
+        specifier: 0.34.49
+        version: 0.34.49
       image-size:
         specifier: ^2.0.2
         version: 2.0.2
       openclaw:
-        specifier: '>=2026.3.22'
+        specifier: '>=2026.5.4'
         version: 2026.5.6(@types/express@5.0.6)
       undici-types:
         specifier: ^8.1.0
@@ -440,8 +440,8 @@ packages:
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
 
-  '@larksuiteoapi/node-sdk@1.62.1':
-    resolution: {integrity: sha512-o9oAjv5Ffnp/6iXIJLHrO6N0US/r2ZZy3xmO6ylGegjuVSC05cx0fADA38Dc1h0FV8T9BDK+ariWk84TNMGbKg==}
+  '@larksuiteoapi/node-sdk@1.65.0':
+    resolution: {integrity: sha512-SkMeiFvi4mMVGrmBBh50vWPOgAvfbcpdcAW+iryheFFHUmji49aDch/YtxsKGFtzFlL/rseQXFzNFL8+LdQQ5Q==}
 
   '@lydell/node-pty-darwin-arm64@1.2.0-beta.12':
     resolution: {integrity: sha512-tqaifcY9Cr41SblO1+FLzh8oxxtkNhuW9Dhl22lKme9BreYvKvxEZcdPIXTuqkJc5tagOEC4QHShKmJjLyLXLQ==}
@@ -836,8 +836,8 @@ packages:
   '@silvia-odwyer/photon-node@0.3.4':
     resolution: {integrity: sha512-bnly4BKB3KDTFxrUIcgCLbaeVVS8lrAkri1pEzskpmxu9MdfGQTy8b8EgcD83ywD3RPMsIulY8xJH5Awa+t9fA==}
 
-  '@sinclair/typebox@0.34.48':
-    resolution: {integrity: sha512-kKJTNuK3AQOrgjjotVxMrCn1sUJwM76wMszfq1kdU4uYVJjvEWuFQ6HgvLt4Xz3fSmZlTOxJ/Ie13KnIcWQXFA==}
+  '@sinclair/typebox@0.34.49':
+    resolution: {integrity: sha512-brySQQs7Jtn0joV8Xh9ZV/hZb9Ozb0pmazDIASBkYKCjXrXU3mpcFahmK/z4YDhGkQvP9mWJbVyahdtU5wQA+A==}
 
   '@slack/bolt@4.7.2':
     resolution: {integrity: sha512-ALHtaS2iaP2WAWgX08yXsoCxEDitC6AqZs26ot6smXJQzBFMM4slVP+w3blLwzUV551xZ/+9RlBmWHsZDJJ5HA==}
@@ -3590,7 +3590,7 @@ snapshots:
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
-  '@larksuiteoapi/node-sdk@1.62.1':
+  '@larksuiteoapi/node-sdk@1.65.0':
     dependencies:
       axios: 1.13.6
       lodash.identity: 3.0.0
@@ -3942,7 +3942,7 @@ snapshots:
 
   '@silvia-odwyer/photon-node@0.3.4': {}
 
-  '@sinclair/typebox@0.34.48': {}
+  '@sinclair/typebox@0.34.49': {}
 
   '@slack/bolt@4.7.2(@types/express@5.0.6)':
     dependencies:

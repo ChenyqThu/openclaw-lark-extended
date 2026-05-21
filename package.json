@@ -44,8 +44,8 @@
     "smoke": "bash scripts/smoke.sh"
   },
   "dependencies": {
-    "@larksuiteoapi/node-sdk": "^1.60.0",
-    "@sinclair/typebox": "0.34.48",
+    "@larksuiteoapi/node-sdk": "^1.64.0",
+    "@sinclair/typebox": "0.34.49",
     "image-size": "^2.0.2",
     "undici-types": "^8.1.0",
     "zod": "^4.3.6"

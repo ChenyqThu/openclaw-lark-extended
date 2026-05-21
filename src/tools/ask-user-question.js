@@ -26,6 +26,7 @@ exports.registerAskUserQuestionTool = registerAskUserQuestionTool;
 const node_crypto_1 = require("node:crypto");
 const typebox_1 = require("@sinclair/typebox");
 const lark_ticket_1 = require("../core/lark-ticket.js");
+const card_action_operator_1 = require("../core/card-action-operator.js");
 const lark_logger_1 = require("../core/lark-logger.js");
 const cardkit_1 = require("../card/cardkit.js");
 const chat_queue_1 = require("../channel/chat-queue.js");
@@ -164,7 +165,7 @@ function handleAskUserAction(data, _cfg, accountId) {
     let openChatId;
     try {
         const event = data;
-        senderOpenId = event.operator?.open_id;
+        senderOpenId = (0, card_action_operator_1.resolveCardCallbackOperatorId)(event.operator);
         // open_chat_id may be at top level or inside context (form submit callbacks use context)
         openChatId = event.open_chat_id ?? event.context?.open_chat_id;
         const actionTag = event.action?.tag;
