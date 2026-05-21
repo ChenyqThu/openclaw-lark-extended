@@ -75,6 +75,7 @@ tail -f /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log        # live log
 
 ## Backups (rollback targets)
 
+- Live tree: `~/.openclaw/openclaw-lark.bak-20260521T104309` (2026.5.20 cutover; pre-cutover state was 0.2.2 + 5.13)
 - Live tree: `~/.openclaw/openclaw-lark.bak-20260514T145949` (2026.5.13 cutover; pre-cutover state was 0.2.1 + 5.12)
 - Live tree: `~/.openclaw/openclaw-lark.bak-20260512T104615` (2026.5.12 cutover)
 - Live tree: `~/.openclaw/openclaw-lark.bak-20260507T133125` (0.2.0 cutover)
@@ -117,7 +118,7 @@ restarts the gateway.
   instead of `operator.open_id` directly, closing the Schema-2 gap in the
   fork's synthetic-message path. No patch retired (all of 1, 2, 5, 7,
   Phase 4, Phase 4-fix remain). Vitest 105/105 green. Live cutover backup
-  `~/.openclaw/openclaw-lark.bak-<timestamp>`; drift-check ✓ no drift.
+  `~/.openclaw/openclaw-lark.bak-20260521T104309`; drift-check ✓ no drift.
 - 2026-05-14 — **0.2.2 baseline absorb of `@larksuite/openclaw-lark@2026.5.13`**
   (Jarvis-led; rewritten clean on take-over to drop accidentally-committed
   `node_modules/` + `.omc/`). Net upstream delta: new `secret-contract-api.{js,d.ts}`
