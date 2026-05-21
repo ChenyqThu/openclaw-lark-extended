@@ -30,6 +30,7 @@ const ask_user_question_1 = require("../tools/ask-user-question.js");
 const chat_queue_1 = require("./chat-queue.js");
 const abort_detect_1 = require("./abort-detect.js");
 const interactive_dispatch_1 = require("./interactive-dispatch.js");
+const card_action_operator_1 = require("../core/card-action-operator.js");
 const elog = (0, lark_logger_1.larkLogger)('channel/event-handlers');
 // ---------------------------------------------------------------------------
 // Event ownership validation
@@ -377,7 +378,7 @@ async function handleCardActionEvent(ctx, data) {
             return sdkResult;
         // ── Patch 1: Non-OAuth card action → forward to agent as synthetic message ──
         const operator = data.operator || {};
-        const openId = operator.open_id;
+        const openId = (0, card_action_operator_1.resolveCardCallbackOperatorId)(operator);
         const action = data.action || {};
         const actionValue = { ...(action.value || {}), ...(action.form_value || {}) };
         if (action.tag) actionValue._action_tag = action.tag;

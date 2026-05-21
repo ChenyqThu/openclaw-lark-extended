@@ -33,6 +33,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleCardAction = handleCardAction;
 exports.handleInvokeErrorWithAutoAuth = handleInvokeErrorWithAutoAuth;
 const lark_ticket_1 = require("../core/lark-ticket.js");
+const card_action_operator_1 = require("../core/card-action-operator.js");
 const lark_logger_1 = require("../core/lark-logger.js");
 const log = (0, lark_logger_1.larkLogger)('tools/auto-auth');
 const api_error_1 = require("../core/api-error.js");
@@ -591,7 +592,7 @@ async function handleCardAction(data, cfg, accountId) {
         const event = data;
         action = event.action?.value?.action;
         operationId = event.action?.value?.operation_id;
-        senderOpenId = event.operator?.open_id;
+        senderOpenId = (0, card_action_operator_1.resolveCardCallbackOperatorId)(event.operator);
     }
     catch {
         return;

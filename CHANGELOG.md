@@ -3,6 +3,79 @@
 Release history for `@lucien/openclaw-lark-extended`. Tracks fork-side
 versions; the upstream baseline at each release is noted in parentheses.
 
+## 0.2.3 — baseline absorb of `@larksuite/openclaw-lark@2026.5.20`
+
+Upstream baseline absorb with one opportunistic alignment. No fork patch
+retired; no behavior change in the common-case Schema-1 path.
+
+### Patch 1 aligned with `resolveCardCallbackOperatorId`
+
+`src/channel/event-handlers.js` previously read the card-callback operator
+identity as `operator.open_id` directly. Upstream 2026.5.20 introduces a
+shared helper in `src/core/card-action-operator.{js,d.ts}` that prefers
+`open_id` and falls back to `user_id` for Schema-2 callbacks (users with
+no `open_id` in the app tenant). The three upstream call sites
+(`src/channel/interactive-dispatch.js`, `src/tools/ask-user-question.js`,
+`src/tools/auto-auth.js`) all adopted the helper in this release.
+
+Patch 1's synthetic-message path now uses the same helper:
+
+```js
+// before
+const openId = operator.open_id;
+
+// after (2026.5.20)
+const openId = (0, card_action_operator_1.resolveCardCallbackOperatorId)(operator);
+```
+
+Net effect: Schema-1 card actions (the common case) are unchanged; Schema-2
+card actions now forward `user_id` into the synthetic event instead of an
+empty identifier. The `_action_name` resolution chain and the rest of
+`handleCardActionEvent` are untouched.
+
+### Other upstream additions (flow through unchanged)
+
+- **NEW** `src/core/card-action-operator.{js,d.ts}` — pure helper described
+  above.
+- `src/card/reply-dispatcher.js`: streaming `onDeliver` path branches on
+  `payload.isReasoning`. When true, deliver via
+  `controller.onReasoningStream(...)`; otherwise `controller.onDeliver(...)`.
+  No effect on the fork's Patch 4b retirement surface (`agentId` DI on
+  `StreamingCardDeps`, which is several functions above this change).
+- `src/core/lark-client.js`: `Lark.defaultHttpInstance.defaults.proxy =
+  false` — disables axios auto-proxy because OpenClaw core now manages
+  proxy routing centrally via `global-agent`. Operationally this means
+  setting `HTTP_PROXY`/`HTTPS_PROXY` env vars no longer affects Feishu
+  SDK requests; configure proxy via core if needed.
+- `src/messaging/converters/video-chat.js`: drops emoji prefixes (📹/🕙)
+  in favour of labelled lines (`Topic:`, `Start time:`, `Meeting number:`).
+- `src/messaging/outbound/actions.js`: the outbound `send` tool gains a
+  typebox schema with a description steering the LLM to **not** call
+  `send` to repeat/finalize the same answer during streaming-card
+  replies — let the active card complete instead. Pure prompt guidance;
+  no API change.
+
+### Dependency bumps
+
+- `@larksuiteoapi/node-sdk`: `^1.60.0` → `^1.64.0` (lockfile resolves
+  `1.65.0`)
+- `@sinclair/typebox`: `0.34.48` → `0.34.49`
+
+### Patches still on the fork
+
+Patches 1, 2, 5, 7, plus Phase 4 (group sender prefix) and Phase 4-fix
+(sender-name fallback). Smoke verifies the 4 patch grep markers; this
+release does not alter the patch count.
+
+### Verification
+
+- `bash scripts/smoke.sh` → ✓ syntax + 4 patch markers + 6 schema keys +
+  vitest 105/105.
+- No new tests required (no behavior change beyond the Schema-2 helper
+  call; the helper is exercised by upstream's existing call sites).
+
+---
+
 ## 0.2.2 — baseline absorb of `@larksuite/openclaw-lark@2026.5.13`
 
 Upstream baseline-only release. No fork-side features or fixes; the only

@@ -17,6 +17,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.feishuMessageActions = void 0;
 const tool_send_1 = require("openclaw/plugin-sdk/tool-send");
 const param_readers_1 = require("openclaw/plugin-sdk/param-readers");
+const typebox_1 = require("@sinclair/typebox");
 const sdk_compat_1 = require("../../core/sdk-compat.js");
 const lark_client_1 = require("../../core/lark-client.js");
 const accounts_1 = require("../../core/accounts.js");
@@ -25,6 +26,14 @@ const reactions_1 = require("./reactions.js");
 const deliver_1 = require("./deliver.js");
 const media_1 = require("./media.js");
 const log = (0, lark_logger_1.larkLogger)('outbound/actions');
+const FEISHU_SEND_TEXT_DESCRIPTION = 'Text to send as a separate Feishu message. During a normal Feishu streaming-card reply, do not call send just to repeat or finalize the same answer; return the final answer normally so the active card can be completed by the reply dispatcher. Use send only when the user explicitly needs an additional separate message.';
+const FEISHU_MESSAGE_TOOL_SCHEMA = {
+    properties: {
+        message: typebox_1.Type.Optional(typebox_1.Type.String({ description: FEISHU_SEND_TEXT_DESCRIPTION })),
+        text: typebox_1.Type.Optional(typebox_1.Type.String({ description: FEISHU_SEND_TEXT_DESCRIPTION })),
+    },
+    visibility: 'current-channel',
+};
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -131,7 +140,7 @@ exports.feishuMessageActions = {
         return {
             actions: Array.from(SUPPORTED_ACTIONS),
             capabilities: ['cards'],
-            schema: null,
+            schema: FEISHU_MESSAGE_TOOL_SCHEMA,
         };
     },
     supportsAction: ({ action }) => SUPPORTED_ACTIONS.has(action),

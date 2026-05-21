@@ -3,12 +3,12 @@
 Snapshot of the fork's current state. Updated when productionization phases
 complete or new upstream baselines are absorbed.
 
-Last updated: **2026-05-14** (after 0.2.2 baseline absorb of `@larksuite/openclaw-lark@2026.5.13` — Patch 4b retired)
+Last updated: **2026-05-21** (after 0.2.3 baseline absorb of `@larksuite/openclaw-lark@2026.5.20` — Patch 1 aligned with `resolveCardCallbackOperatorId`)
 
 ## TL;DR
 
-- Fork version: **0.2.2** (baseline absorb; Patch 4b retired — see CHANGELOG)
-- Upstream baseline: **`@larksuite/openclaw-lark@2026.5.13`** (in sync with npm latest)
+- Fork version: **0.2.3** (baseline absorb; Patch 1 Schema-2 alignment — see CHANGELOG)
+- Upstream baseline: **`@larksuite/openclaw-lark@2026.5.20`** (in sync with npm latest)
 - Distribution: **internal team share** via private GitHub repo
   [`ChenyqThu/openclaw-lark-extended`](https://github.com/ChenyqThu/openclaw-lark-extended);
   npm publish not yet
@@ -72,6 +72,21 @@ openclaw gateway status                                     # service detail
 
 ## Recently completed
 
+- 2026-05-21 — **0.2.3 baseline absorb of `@larksuite/openclaw-lark@2026.5.20`**.
+  Net upstream delta: new `src/core/card-action-operator.{js,d.ts}` (Schema-2
+  card-callback identity helper), three call sites refactored to use it
+  (`interactive-dispatch.js`, `ask-user-question.js`, `auto-auth.js`),
+  `reply-dispatcher.js` gains `isReasoning` streaming branch routing to
+  `controller.onReasoningStream`, `lark-client.js` disables axios auto-proxy
+  (proxy now centralized in OpenClaw core's `global-agent`), `video-chat.js`
+  swaps emoji prefixes for labelled lines + meeting number, `actions.js`
+  send-tool gets a typebox schema steering the LLM away from
+  duplicate-finalize sends. Deps: `@larksuiteoapi/node-sdk` `^1.60.0`→`^1.64.0`,
+  `@sinclair/typebox` `0.34.48`→`0.34.49`. **Patch 1 opportunistically
+  aligned** — `event-handlers.js` now reads the card-callback operator id
+  via `resolveCardCallbackOperatorId(operator)` instead of `operator.open_id`
+  directly, closing the Schema-2 gap. No patch retired (all of 1, 2, 5, 7,
+  Phase 4, Phase 4-fix remain). Vitest 105/105 green.
 - 2026-05-14 — **0.2.2 baseline absorb of `@larksuite/openclaw-lark@2026.5.13`**.
   Net upstream delta: new `secret-contract-api.{js,d.ts}` (Plugin Secret
   Contract API, fork does not consume yet), `peerDependencies.openclaw`
