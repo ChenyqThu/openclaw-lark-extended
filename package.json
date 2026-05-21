@@ -1,6 +1,6 @@
 {
   "name": "@larksuite/openclaw-lark",
-  "version": "2026.5.13",
+  "version": "2026.5.20",
   "description": "OpenClaw Lark/Feishu channel plugin",
   "exports": {
     ".": {
@@ -23,8 +23,8 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@larksuiteoapi/node-sdk": "^1.60.0",
-    "@sinclair/typebox": "0.34.48",
+    "@larksuiteoapi/node-sdk": "^1.64.0",
+    "@sinclair/typebox": "0.34.49",
     "image-size": "^2.0.2",
     "undici-types": "^8.1.0",
     "zod": "^4.3.6"
