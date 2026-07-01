@@ -3,6 +3,107 @@
 Release history for `@lucien/openclaw-lark-extended`. Tracks fork-side
 versions; the upstream baseline at each release is noted in parentheses.
 
+## 0.2.4 — baseline absorb of `@larksuite/openclaw-lark@2026.6.10`
+
+Bot-at-bot release absorb with reconciliation. Upstream 2026.6.10 adds native
+group bot-to-bot awareness that overlaps the fork's `feishu-social` extension
+and Phase 4 sender-labeling. No fork patch retired; no dependency changes
+(upstream bumped only its own version).
+
+### Upstream 2026.6.10 in one line
+
+Native "bot-at-bot" support: bots can address each other in Feishu groups
+without the reply vanishing into a hidden topic view (#32980), without endless
+ping-pong loops, and with deterministic `<at>` delivery.
+
+### New upstream modules (adopted, no fork equivalent)
+
+- `src/messaging/inbound/bot-content.js` — `resolveFeishuReplyRouting`
+  (topic-thread inference + bot-peer suppression) and `resolveBotPeerForMention`.
+- `src/messaging/inbound/bot-loop-guard.js` — consecutive bot-turn counter
+  (cap 10, human turn resets, idle decay).
+- `src/messaging/inbound/mention-registry.js` — ephemeral name→openId cache
+  feeding outbound `@Name` resolution.
+- `src/messaging/outbound/outbound-mention.js` — `normalizeOutboundMentions`
+  (six LLM @-shapes → `<at>`) + `ensureMention` (deterministic peer-@ backstop).
+- `src/messaging/outbound/bot-peer-context.js` — AsyncLocalStorage peer context.
+
+### Other upstream changes (flow through unchanged)
+
+- `handler.js`: self-echo hard filter; a "bare @" (mention, no text) is treated
+  as a wake-up ping; feeds mention-registry; re-arms the bot-loop guard on human
+  turns.
+- `abort-detect.js`: `isConversationStopIntent` (substring zh/en stop phrases).
+- `reply-mode.js`: markdown tables no longer force a card (cards break
+  bot-at-bot @ delivery); the table-count guard is kept as a safety valve.
+- `outbound.js` / `send.js`: apply the `ensureMention` peer backstop on both the
+  text and card send paths, de-duped across chunks.
+- `content-converter-helpers.js`: bot self-mention leading-strip.
+- `vc-meeting-invited-handler.js`: `call_id` threaded into the auto-join prompt.
+
+### Conflict resolution (4 files)
+
+- **package.json** — kept fork name/version/description.
+- **`src/core/config-schema.{js,d.ts}`** — kept the fork's wider
+  `replyInThread` (`boolean | 'enabled' | 'disabled'`) plus the
+  `spinnerPhrases`/`typingEmoji` account keys; adopted upstream's comments.
+  Upstream independently added a boolean `replyInThread`; the fork's union is a
+  superset.
+- **`src/messaging/inbound/dispatch-builders.js`** — kept the fork's
+  `(ctx, opts)` mention-annotation signature and the `[name](open_id):` group
+  body prefix (Phase 4); adopted upstream's new exports
+  `buildFeishuIdentityFields` and `buildFeishuGroupSystemPrompt`.
+
+### Reconciliation decisions (合入并同步精简)
+
+- **`replyInThread` harmonized.** `dispatch.js` now feeds the fork's
+  `resolveReplyInThread()` (honours the `'enabled'`/`'disabled'` strings and
+  per-group > `'*'` > account precedence) into upstream's
+  `resolveFeishuReplyRouting`, whose bot-peer escape hatch only tests
+  `=== true`. Without this an operator's `'enabled'` string would be ignored and
+  bot→bot replies forced out of the thread. Patch 2 (force-into-thread in
+  `dispatch-context.js`) stays as a distinct feature.
+- **Mention note de-duplicated.** Upstream's new self-mention note ("you were
+  directly @mentioned; the body is addressed to you") is dropped in favour of
+  the fork's stronger imperative directive ("you MUST respond — do NOT output
+  NO_REPLY"). The addressee's open_id is already injected via
+  `buildFeishuGroupSystemPrompt` and the `BotOpenId` identity field, so the
+  dropped note carried no unique signal.
+- **Kept complementary (verified no harmful double-apply):** `feishu-social`
+  storm-guard (tuned threshold + admin DM) coexists with upstream
+  `bot-loop-guard` (dormant cap-10 backstop); `feishu-social` Hook 3
+  `@alias`→`<at>` coexists with upstream `normalizeOutboundMentions` /
+  `ensureMention` (both idempotent — no double-@); `feishu-social` group-history
+  injection (`before_prompt_build`) coexists with `buildFeishuGroupSystemPrompt`.
+
+### Further slimming (deferred, maintainer decision)
+
+Retiring `feishu-social` storm-guard or the Hook 3 alias-rewrite in favour of
+upstream's native equivalents would cut maintenance surface but lose the tuned
+threshold + admin-DM alerting and the configured-alias rewriting. Left in
+place; revisit as a separate focused pass if desired.
+
+### Patches still on the fork
+
+Patches 1, 2, 5, 7, plus Phase 4 (group sender prefix) and Phase 4-fix
+(sender-name fallback). Smoke verifies the 4 patch grep markers; this release
+does not alter the patch count.
+
+### Dependency bumps
+
+None. Upstream 2026.6.10 changed only its own package version.
+
+### Verification
+
+- `bash scripts/smoke.sh` → ✓ syntax + 4 patch markers + 6 schema keys +
+  vitest 105/105.
+- `node scripts/replay-feishu-event.mjs test/fixtures/feishu/*.json` → fixture
+  parse clean.
+- Targeted checks: `replyInThread` string/precedence mapping; single mention
+  note (no upstream duplicate); outbound no double-@ on the bot-peer path.
+
+---
+
 ## 0.2.3 — baseline absorb of `@larksuite/openclaw-lark@2026.5.20`
 
 Upstream baseline absorb with one opportunistic alignment. No fork patch
