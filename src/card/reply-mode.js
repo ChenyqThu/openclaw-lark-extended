@@ -59,17 +59,20 @@ function expandAutoMode(params) {
  * markdown tables).
  */
 function shouldUseCard(text) {
-    // Table limit takes priority -- even with code blocks, too many tables will fail
+    // Markdown tables NO LONGER force a card. Feishu messages render markdown
+    // tables natively, and wrapping a reply in a card breaks bot-at-bot @
+    // delivery (cards have limited @ support). Only fenced code blocks still
+    // benefit from card rendering.
+    //
+    // The table-count guard is kept as a safety valve: when a reply also
+    // contains an excessive number of markdown tables, skip the card entirely
+    // rather than risk a card-render failure.
     const tableMatches = (0, card_error_1.findMarkdownTablesOutsideCodeBlocks)(text);
     if (tableMatches.length > card_error_1.FEISHU_CARD_TABLE_LIMIT) {
         return false;
     }
     // Fenced code blocks
     if (/```[\s\S]*?```/.test(text)) {
-        return true;
-    }
-    // Markdown tables (header + separator rows separated by pipes)
-    if (tableMatches.length > 0) {
         return true;
     }
     return false;
