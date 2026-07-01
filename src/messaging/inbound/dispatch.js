@@ -24,7 +24,7 @@ const chat_queue_1 = require("../../channel/chat-queue.js");
 const tool_use_config_1 = require("../../card/tool-use-config.js");
 const tool_use_trace_store_1 = require("../../card/tool-use-trace-store.js");
 const abort_detect_1 = require("../../channel/abort-detect.js");
-const chat_info_cache_1 = require("../../core/chat-info-cache.js");
+const bot_peer_context_1 = require("../outbound/bot-peer-context.js");
 const comment_target_1 = require("../../core/comment-target.js");
 const synthetic_target_1 = require("../../core/synthetic-target.js");
 const targets_1 = require("../../core/targets.js");
@@ -33,6 +33,7 @@ const doctor_1 = require("../../commands/doctor.js");
 const auth_1 = require("../../commands/auth.js");
 const index_1 = require("../../commands/index.js");
 const send_1 = require("../outbound/send.js");
+const bot_content_1 = require("./bot-content.js");
 const dispatch_commands_1 = require("./dispatch-commands.js");
 const dispatch_builders_1 = require("./dispatch-builders.js");
 const sentinel_store_1 = require("./sentinel-store.js");
@@ -162,7 +163,7 @@ async function dispatchSyntheticMessage(dc, ctxPayload, skillFilter) {
     });
     dc.log(`feishu[${dc.account.accountId}]: synthetic dispatch complete (elapsed=${(0, lark_ticket_1.ticketElapsed)()}ms)`);
 }
-async function dispatchNormalMessage(dc, ctxPayload, chatHistories, historyKey, historyLimit, replyToMessageId, skillFilter, skipTyping) {
+async function dispatchNormalMessage(dc, ctxPayload, routing, chatHistories, historyKey, historyLimit, replyToMessageId, skillFilter, skipTyping, botPeer) {
     // Synthetic targets (e.g. VC meeting-invited) have no real IM peer to
     // deliver replies to. Route them through the buffered block dispatcher
     // with a deliver() that drops every payload — the agent still runs
@@ -209,8 +210,8 @@ async function dispatchNormalMessage(dc, ctxPayload, chatHistories, historyKey, 
         accountId: dc.account.accountId,
         chatType: dc.ctx.chatType,
         skipTyping,
-        replyInThread: dc.isThread,
-        threadId: dc.isThread ? dc.ctx.threadId : undefined,
+        replyInThread: routing.replyInThread,
+        threadId: routing.threadId,
         toolUseDisplay,
     });
     // Create an AbortController so the abort fast-path can cancel the
@@ -222,8 +223,15 @@ async function dispatchNormalMessage(dc, ctxPayload, chatHistories, historyKey, 
     (0, chat_queue_1.registerActiveDispatcher)(queueKey, { abortCard, abortController });
     dc.log(`feishu[${dc.account.accountId}]: dispatching to agent (session=${effectiveSessionKey})`);
     log.info(`dispatching to agent (session=${effectiveSessionKey})`);
+    // Attach the resolved bot-peer (if any) so the outbound `ensureMention`
+    // backstop can guarantee an @ even when the LLM forgets. Resolved by the
+    // caller (dispatchToAgent) and decoupled from thread routing. Undefined →
+    // pure no-op.
+    const withBotPeer = botPeer
+        ? (fn) => (0, bot_peer_context_1.runWithBotPeerContext)(botPeer, fn)
+        : (fn) => fn();
     try {
-        const { queuedFinal, counts } = await dc.core.channel.reply.dispatchReplyFromConfig({
+        const { queuedFinal, counts } = await withBotPeer(() => dc.core.channel.reply.dispatchReplyFromConfig({
             ctx: ctxPayload,
             cfg: dc.accountScopedCfg,
             dispatcher,
@@ -232,14 +240,17 @@ async function dispatchNormalMessage(dc, ctxPayload, chatHistories, historyKey, 
                 abortSignal: abortController.signal,
                 ...(skillFilter ? { skillFilter } : {}),
             },
-        });
+        }));
         // Wait for all enqueued deliver() calls in the SDK's sendChain to
         // complete before marking the dispatch as done.  Without this,
         // dispatchReplyFromConfig() may return while the final deliver() is
         // still pending in the Promise chain, causing markFullyComplete() to
         // block it and leaving completedText incomplete — which in turn makes
         // the streaming card's final update show truncated content.
-        await dispatcher.waitForIdle();
+        //
+        // Run under withBotPeer too so any deliveries flushed during waitForIdle
+        // still see the peer context.
+        await withBotPeer(() => dispatcher.waitForIdle());
         markFullyComplete();
         markDispatchIdle();
         // Clean up consumed history entries
@@ -263,23 +274,13 @@ async function dispatchNormalMessage(dc, ctxPayload, chatHistories, historyKey, 
 async function dispatchToAgent(params) {
     // 1. Derive shared context (including route resolution + system event)
     const dc = (0, dispatch_context_1.buildDispatchContext)(params);
-    // 1a. Thread detection fallback for topic groups.
-    //     In topic groups (chat_mode=topic), reply events may carry root_id
-    //     without thread_id.  When threadSession is enabled, use root_id as
-    //     a synthetic threadId so replies stay inside the topic instead of
-    //     creating a new top-level message.
-    if (!dc.isThread && dc.isGroup && dc.ctx.rootId && dc.account.config?.threadSession === true) {
-        const threadCapable = await (0, chat_info_cache_1.isThreadCapableGroup)({
-            cfg: dc.accountScopedCfg,
-            chatId: dc.ctx.chatId,
-            accountId: dc.account.accountId,
-        });
-        if (threadCapable) {
-            log.info(`inferred thread from root_id=${dc.ctx.rootId} in topic group ${dc.ctx.chatId}`);
-            dc.isThread = true;
-            dc.ctx = { ...dc.ctx, threadId: dc.ctx.rootId };
-        }
-    }
+    // 1a. Reply routing: handles topic-group thread inference (may mutate dc)
+    //     and bot-peer suppression for bot→bot group scenarios (#32980).
+    //     See src/messaging/inbound/bot-content.ts for the full rationale.
+    const replyInThreadConfig = params.groupConfig?.replyInThread ??
+        params.defaultGroupConfig?.replyInThread ??
+        dc.account.config?.replyInThread;
+    const routing = await (0, bot_content_1.resolveFeishuReplyRouting)(dc, { replyInThreadConfig });
     // 1b. Resolve thread session isolation (async: may query group info API)
     if (dc.isThread && dc.ctx.threadId) {
         dc.threadSessionKey = await (0, dispatch_context_1.resolveThreadSessionKey)({
@@ -329,8 +330,14 @@ async function dispatchToAgent(params) {
         : undefined;
     // 8. Build inbound context payload
     const isBareNewOrReset = /^\/(?:new|reset)\s*$/i.test((params.ctx.content ?? '').trim());
-    const groupSystemPrompt = dc.isGroup
+    const configuredGroupPrompt = dc.isGroup
         ? params.groupConfig?.systemPrompt?.trim() || params.defaultGroupConfig?.systemPrompt?.trim() || undefined
+        : undefined;
+    // In group chats, always inject bot-at-bot guidance (self open_id + @
+    // delivery rules + loop hygiene), merged with any operator-configured
+    // group prompt. Complements the deterministic ensureMention safety net.
+    const groupSystemPrompt = dc.isGroup
+        ? (0, dispatch_builders_1.buildFeishuGroupSystemPrompt)(configuredGroupPrompt, params.botOpenId)
         : undefined;
     const originatingTo = isBareNewOrReset && dc.isThread
         ? (0, targets_1.encodeFeishuRouteTarget)({
@@ -360,6 +367,7 @@ async function dispatchToAgent(params) {
         extraFields: {
             ...params.mediaPayload,
             ...(params.extraInboundFields ?? {}),
+            ...(0, dispatch_builders_1.buildFeishuIdentityFields)(params.ctx, params.botOpenId),
             ...(groupSystemPrompt ? { GroupSystemPrompt: groupSystemPrompt } : {}),
             ...(dc.ctx.threadId ? { MessageThreadId: dc.ctx.threadId } : {}),
         },
@@ -410,7 +418,7 @@ async function dispatchToAgent(params) {
                 card,
                 replyToMessageId: params.replyToMessageId ?? dc.ctx.messageId,
                 accountId: dc.account.accountId,
-                replyInThread: dc.isThread,
+                replyInThread: routing.replyInThread,
             });
         }
         catch (err) {
@@ -422,7 +430,7 @@ async function dispatchToAgent(params) {
                 text: `${i18nCommandName} failed: ${errMsg}`,
                 replyToMessageId: params.replyToMessageId ?? dc.ctx.messageId,
                 accountId: dc.account.accountId,
-                replyInThread: dc.isThread,
+                replyInThread: routing.replyInThread,
             });
         }
         return;
@@ -450,6 +458,20 @@ async function dispatchToAgent(params) {
         // System commands intentionally skip history cleanup — command handlers
         // don't consume history context, so entries are preserved for the next
         // normal message.
-        await dispatchNormalMessage(dc, ctxPayload, params.chatHistories, historyKey, params.historyLimit, params.replyToMessageId, skillFilter, params.skipTyping);
+        // A human asking the bots to stop ("中断对话", "stop talking", …) must NOT
+        // get a forced peer-@: the deterministic ensureMention backstop would
+        // re-wake the peer bot and defeat the interruption. Skip peer resolution
+        // on stop-intent; the kickoff/continue path ("你们辩论") is unaffected.
+        const botPeer = (0, abort_detect_1.isConversationStopIntent)(dc.ctx.content ?? '')
+            ? undefined
+            : (0, bot_content_1.resolveBotPeerForMention)({
+                isGroup: dc.isGroup,
+                senderIsBot: dc.ctx.senderIsBot,
+                senderId: dc.ctx.senderId,
+                senderName: dc.ctx.senderName ?? undefined,
+                mentions: dc.ctx.mentions,
+                botOpenId: params.botOpenId,
+            });
+        await dispatchNormalMessage(dc, ctxPayload, routing, params.chatHistories, historyKey, params.historyLimit, params.replyToMessageId, skillFilter, params.skipTyping, botPeer);
     }
 }

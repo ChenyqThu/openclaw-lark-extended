@@ -55,8 +55,13 @@ function buildConvertContextFromItem(item, fallbackMessageId, accountId) {
 /**
  * Resolve mention placeholders in text.
  *
- * - Bot mentions: remove the placeholder key and any preceding `@botName`
- *   entirely (with trailing whitespace).
+ * - Bot self-mention + stripBotMentions: leading-only strip. When the
+ *   self-mention sits at the very start of the message, drop it (the
+ *   `WasMentioned` envelope field already tells the agent "this message
+ *   was addressed to you", so the anchor is redundant). When it appears
+ *   mid-text, render it as plain `@Name` so the surrounding context still
+ *   reads naturally without leaving an inline anchor the LLM might echo
+ *   back into its reply.
  * - Non-bot mentions: replace the placeholder key with readable `@name`.
  */
 function resolveMentions(text, ctx) {
@@ -65,8 +70,9 @@ function resolveMentions(text, ctx) {
     let result = text;
     for (const [key, info] of ctx.mentions) {
         if (info.isBot && ctx.stripBotMentions) {
-            result = result.replace(new RegExp(`@${(0, utils_1.escapeRegExp)(info.name)}\\s*`, 'g'), '').trim();
-            result = result.replace(new RegExp((0, utils_1.escapeRegExp)(key) + '\\s*', 'g'), '').trim();
+            result = result.replace(new RegExp((0, utils_1.escapeRegExp)(key), 'g'), `@${info.name}`);
+            const leadingPattern = new RegExp(`^\\s*@${(0, utils_1.escapeRegExp)(info.name)}[\\s,，:：]*`);
+            result = result.replace(leadingPattern, '').trimStart();
         }
         else {
             result = result.replace(new RegExp((0, utils_1.escapeRegExp)(key), 'g'), `@${info.name}`);

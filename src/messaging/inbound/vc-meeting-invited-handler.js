@@ -77,6 +77,7 @@ function buildSyntheticEvent(event) {
         senderUnionId: sender.senderUnionId,
         senderName: sender.senderName,
         inviteTime: event.invite_time?.trim() || undefined,
+        callId: event.call_id?.trim() || undefined,
     };
 }
 function buildSyntheticContext(event) {
@@ -85,7 +86,15 @@ function buildSyntheticContext(event) {
     // reply language is still governed by the agent/session prompt stack.
     // If we later need locale-aware synthetic prompts, this is the single place
     // to introduce a template or config-based language switch.
-    const syntheticText = `Use the available tool to join the meeting with meeting number ${event.meetingNo} immediately. Do not ask for confirmation.`;
+    // Only append the call_id instruction when the invite event actually
+    // carries one. Forcing call_id="" into the prompt would assume every
+    // downstream join tool / CLI shortcut already recognises the parameter —
+    // during rollout that assumption can break auto-join. When absent we keep
+    // the legacy prompt shape so behavior degrades to the pre-call_id path.
+    const callIdInstruction = event.callId
+        ? ` When invoking the join tool, pass call_id="${event.callId}".`
+        : '';
+    const syntheticText = `Use the available tool to join the meeting with meeting number ${event.meetingNo} immediately. Do not ask for confirmation.${callIdInstruction}`;
     const syntheticMessageId = event.eventId
         ? `vc-invited:event:${event.eventId}`
         : `vc-invited:${event.meetingNo}:${event.inviteTime ?? crypto.randomUUID()}`;
@@ -207,6 +216,7 @@ async function handleFeishuVcMeetingInvited(params) {
                 VcMeetingTopic: syntheticEvent.topic,
                 VcInviterOpenId: syntheticEvent.senderOpenId,
                 VcInviteTime: syntheticEvent.inviteTime,
+                VcCallId: syntheticEvent.callId,
             },
             quotedContent: undefined,
             account,

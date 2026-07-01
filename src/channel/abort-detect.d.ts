@@ -22,6 +22,19 @@ export declare function isAbortTrigger(text: string): boolean;
  */
 export declare function isLikelyAbortText(text: string): boolean;
 /**
+ * Whether an inbound message expresses intent to stop / interrupt the ongoing
+ * (bot-to-bot) exchange. Superset of {@link isLikelyAbortText} plus the
+ * conversational phrases above.
+ *
+ * Two consumers: (1) suppress the deterministic peer-@ backstop so a stop
+ * acknowledgement doesn't re-wake the peer bot; (2) mute an active bot loop so
+ * the in-flight ping-pong drains instead of being re-armed. Substring match —
+ * keep the list distinctive (no bare "停"/"stop") to limit false positives;
+ * the worst case is a missed forced-@ or a self-healing mute (any normal
+ * message lifts it).
+ */
+export declare function isConversationStopIntent(text: string): boolean;
+/**
  * Extract the raw text payload from a Feishu message event.
  *
  * Only handles `text` type messages.  The `message.content` field is a

@@ -77,6 +77,24 @@ export declare function buildInboundPayload(dc: DispatchContext, opts: {
     extraFields?: Record<string, unknown>;
 }): ReturnType<typeof LarkClient.runtime.channel.reply.finalizeInboundContext>;
 /**
+ * Structured identity signals injected into the agent envelope so the LLM
+ * can tell "who is talking to me" apart — in particular whether the sender
+ * is a bot, and what the bot's own open_id is.
+ *
+ * BotOpenId is omitted when unknown (e.g. startup race before the bot info
+ * probe completes) to avoid surfacing an empty identity to the agent.
+ */
+export declare function buildFeishuIdentityFields(ctx: MessageContext, botOpenId?: string): Record<string, unknown>;
+/**
+ * Build the effective group system prompt for a Feishu group chat.
+ *
+ * Always prepends bot-at-bot guidance (self-identity + @ semantics + loop
+ * hygiene) so the agent knows which open_id is itself, how Feishu @-delivery
+ * works, and when to stop; then appends any operator-configured group
+ * systemPrompt. Returns `undefined` only when there is nothing to inject.
+ */
+export declare function buildFeishuGroupSystemPrompt(configured: string | undefined, botOpenId?: string): string | undefined;
+/**
  * Format the agent envelope and prepend group chat history if applicable.
  * Returns the combined body and the history key (undefined for DMs).
  */
