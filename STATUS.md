@@ -3,26 +3,27 @@
 Snapshot of the fork's current state. Updated when productionization phases
 complete or live deployment changes.
 
-Last updated: **2026-05-21** (after 0.2.3 baseline absorb of `@larksuite/openclaw-lark@2026.5.20` — Patch 1 aligned with `resolveCardCallbackOperatorId`)
+Last updated: **2026-06-30** (after 0.2.4 baseline absorb of `@larksuite/openclaw-lark@2026.6.10` — bot-at-bot release; `replyInThread` harmonized, mention-note de-duplicated, `feishu-social` kept complementary)
 
 ## TL;DR
 
-- Fork version: **0.2.3** (baseline absorb; Patch 1 Schema-2 alignment — see CHANGELOG)
-- Upstream baseline: **`@larksuite/openclaw-lark@2026.5.20`** (in sync with npm latest)
+- Fork version: **0.2.4** (bot-at-bot baseline absorb + reconciliation — see CHANGELOG)
+- Upstream baseline: **`@larksuite/openclaw-lark@2026.6.10`** (in sync with npm latest)
 - Distribution: **internal team share** via private GitHub repo
   [`ChenyqThu/openclaw-lark-extended`](https://github.com/ChenyqThu/openclaw-lark-extended);
   npm publish not yet
 - Live deployment: ✅ running on the maintainer's mac-mini gateway, gateway
-  active on 127.0.0.1:18789, drift-check ✓ no drift after 2026-05-21
-  cutover. Live tree contents match `lucien/main` HEAD.
+  active on 127.0.0.1:18789. **0.2.4 is landed in git but NOT yet deployed** —
+  the live tree is still the 0.2.3 cutover (2026-05-21); expect `drift-check`
+  to report the 0.2.4 delta until `scripts/deploy.sh` re-cuts the live tree.
 
 ## Branches
 
 | Branch | Tip | Purpose |
 |---|---|---|
-| `main` | `1a64a98b` | Public-ready productionized fork. No private deployment data. |
-| `lucien/main` | `cd10bbf9` | Live deployment branch. `main` + private overlay (deploy/rollback/drift/upstream-watch scripts, `DEPLOY.md`, `MIGRATION.lucien.md`, private spinner phrase pools). |
-| `upstream/main` | `b3174a09` | Force-rebaselined `npm pack @larksuite/openclaw-lark@2026.5.20`. |
+| `main` | `95e89010` | Public-ready productionized fork. No private deployment data. |
+| `lucien/main` | `624ff5de` | Live deployment branch. `main` + private overlay (deploy/rollback/drift/upstream-watch scripts, `DEPLOY.md`, `MIGRATION.lucien.md`, private spinner phrase pools). |
+| `upstream/main` | `d57b1be9` | Force-rebaselined `npm pack @larksuite/openclaw-lark@2026.6.10`. |
 
 Tags:
 - `lucien-main-pre-productionization-v1` → `1aa2628`
