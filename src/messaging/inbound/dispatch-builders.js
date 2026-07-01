@@ -14,6 +14,8 @@ exports.buildMentionAnnotation = buildMentionAnnotation;
 exports.buildMessageBody = buildMessageBody;
 exports.buildBodyForAgent = buildBodyForAgent;
 exports.buildInboundPayload = buildInboundPayload;
+exports.buildFeishuIdentityFields = buildFeishuIdentityFields;
+exports.buildFeishuGroupSystemPrompt = buildFeishuGroupSystemPrompt;
 exports.buildEnvelopeWithHistory = buildEnvelopeWithHistory;
 const reply_history_1 = require("openclaw/plugin-sdk/reply-history");
 const chat_queue_1 = require("../../channel/chat-queue.js");
@@ -41,6 +43,11 @@ const MENTION_USAGE_HINT = 'To @mention in a reply, use `<at user_id="ou_xxx">Na
  * `wasMentioned` is the same boolean that flows into the SDK's
  * `WasMentioned` field — computed once in dispatch.js so the @all branch
  * (and any future broadening of the rule) applies here automatically.
+ *
+ * Upstream 2026.6.10 added a separate "you were directly @mentioned"
+ * self-mention note here; the fork drops it as redundant — this directive
+ * already conveys the addressee signal (more forcefully), and the bot's own
+ * open_id is injected via GroupSystemPrompt + the BotOpenId identity field.
  *
  * Returns `undefined` when no section is needed. Sender identity / chat
  * metadata are handled by the SDK's own `buildInboundUserContextPrefix`
@@ -176,6 +183,50 @@ function buildInboundPayload(dc, opts) {
         OriginatingChannel: 'feishu',
         OriginatingTo: opts.originatingTo ?? dc.feishuTo,
     });
+}
+// ---------------------------------------------------------------------------
+// Bot-at-Bot identity & guidance
+// ---------------------------------------------------------------------------
+/**
+ * Structured identity signals injected into the agent envelope so the LLM
+ * can tell "who is talking to me" apart — in particular whether the sender
+ * is a bot, and what the bot's own open_id is.
+ *
+ * BotOpenId is omitted when unknown (e.g. startup race before the bot info
+ * probe completes) to avoid surfacing an empty identity to the agent.
+ */
+function buildFeishuIdentityFields(ctx, botOpenId) {
+    return {
+        SenderIsBot: ctx.senderIsBot ?? false,
+        ...(botOpenId ? { BotOpenId: botOpenId } : {}),
+    };
+}
+/** Static guidance about Feishu's bot-at-bot @ semantics and loop hygiene. */
+const FEISHU_BOT_AT_BOT_GUIDANCE = 'On Feishu, another bot only receives a message when you explicitly @-mention it; ' +
+    'a plain message or a reply without an @ will NOT reach another bot. ' +
+    'When you need another bot to continue the work, @-mention it. ' +
+    'When no further action is needed, or you are asked to stop, do not reply — ' +
+    'this avoids endless bot-to-bot loops.';
+/**
+ * Build the effective group system prompt for a Feishu group chat.
+ *
+ * Always prepends bot-at-bot guidance (self-identity + @ semantics + loop
+ * hygiene) so the agent knows which open_id is itself, how Feishu @-delivery
+ * works, and when to stop; then appends any operator-configured group
+ * systemPrompt. Returns `undefined` only when there is nothing to inject.
+ */
+function buildFeishuGroupSystemPrompt(configured, botOpenId) {
+    const parts = [];
+    if (botOpenId) {
+        parts.push(`Your own Feishu open_id is "${botOpenId}"; any @-mention of this open_id refers to you.`);
+    }
+    parts.push(FEISHU_BOT_AT_BOT_GUIDANCE);
+    const trimmedConfigured = configured?.trim();
+    if (trimmedConfigured) {
+        parts.push(trimmedConfigured);
+    }
+    const merged = parts.join('\n\n').trim();
+    return merged || undefined;
 }
 // ---------------------------------------------------------------------------
 // Envelope + history builder

@@ -133,6 +133,9 @@ exports.FeishuGroupSchema = zod_1.z.object({
     allowFrom: AllowFromSchema,
     systemPrompt: zod_1.z.string().optional(),
     allowBots: AllowBotsSchema,
+    // When true, bot-to-bot replies are allowed to stay inside a thread/topic
+    // instead of being forced to the main chat (relaxes the #32980 guard).
+    // Fork widens the accepted type to boolean | 'enabled' | 'disabled'.
     replyInThread: ReplyInThreadSchema,
 });
 // ---------------------------------------------------------------------------
@@ -181,6 +184,9 @@ exports.FeishuAccountConfigSchema = zod_1.z.object({
     reactionNotifications: ReactionNotificationModeSchema,
     threadSession: zod_1.z.boolean().optional(),
     allowBots: AllowBotsSchema,
+    // Account-level default for letting bot-to-bot replies stay in a thread
+    // (per-group `replyInThread` overrides this). Fork widens the accepted
+    // type to boolean | 'enabled' | 'disabled'.
     replyInThread: ReplyInThreadSchema,
     spinnerPhrases: zod_1.z.array(zod_1.z.string()).optional(),
     typingEmoji: zod_1.z.string().optional(),

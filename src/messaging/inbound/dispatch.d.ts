@@ -45,4 +45,6 @@ export declare function dispatchToAgent(params: {
     defaultGroupConfig?: FeishuGroupConfig;
     /** When true, the reply dispatcher skips typing indicators. */
     skipTyping?: boolean;
+    /** The receiving bot's own open_id, used for self-identity injection. */
+    botOpenId?: string;
 }): Promise<void>;

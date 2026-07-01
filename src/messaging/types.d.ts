@@ -177,6 +177,8 @@ export interface FeishuVcMeetingInvitedEvent {
         user_name?: string;
     };
     invite_time?: string;
+    /** Correlation id carried by the invite event; forward to the join tool when present. */
+    call_id?: string;
 }
 /**
  * Internal synthetic event model for VC meeting-invited flows.
@@ -197,6 +199,8 @@ export interface VcMeetingInvitedSyntheticEvent {
     senderUnionId?: string;
     senderName?: string;
     inviteTime?: string;
+    /** Correlation id forwarded from the invite event; pass through to the join tool. */
+    callId?: string;
 }
 /** Metadata describing a media resource in a message (no binary data). */
 export interface ResourceDescriptor {
