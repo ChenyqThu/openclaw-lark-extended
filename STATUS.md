@@ -3,26 +3,27 @@
 Snapshot of the fork's current state. Updated when productionization phases
 complete or live deployment changes.
 
-Last updated: **2026-06-30** (after 0.2.4 baseline absorb of `@larksuite/openclaw-lark@2026.6.10` — bot-at-bot release; `replyInThread` harmonized, mention-note de-duplicated, `feishu-social` kept complementary)
+Last updated: **2026-06-30** (0.2.5 — openclaw core 2026.6.11 plugin-config-validation compat fix, deployed live; atop the 0.2.4 `@larksuite/openclaw-lark@2026.6.10` bot-at-bot absorb)
 
 ## TL;DR
 
-- Fork version: **0.2.4** (bot-at-bot baseline absorb + reconciliation — see CHANGELOG)
+- Fork version: **0.2.5** (core 2026.6.11 config-schema compat fix, deployed; 0.2.4 = bot-at-bot absorb — see CHANGELOG)
 - Upstream baseline: **`@larksuite/openclaw-lark@2026.6.10`** (in sync with npm latest)
 - Distribution: **internal team share** via private GitHub repo
   [`ChenyqThu/openclaw-lark-extended`](https://github.com/ChenyqThu/openclaw-lark-extended);
   npm publish not yet
-- Live deployment: ✅ running on the maintainer's mac-mini gateway, gateway
-  active on 127.0.0.1:18789. **0.2.4 is landed in git but NOT yet deployed** —
-  the live tree is still the 0.2.3 cutover (2026-05-21); expect `drift-check`
-  to report the 0.2.4 delta until `scripts/deploy.sh` re-cuts the live tree.
+- Live deployment: ✅ **0.2.5 deployed 2026-06-30** on the maintainer's mac-mini
+  gateway (default profile, 127.0.0.1:18789, active). Fixes the core-2026.6.11
+  startup crash (`config.social` rejected by `emptyPluginConfigSchema`).
+  `drift-check` ✓ no drift (live tree matches `lucien/main`). Lyra profile
+  (18800) untouched. Backup: `~/.openclaw/openclaw-lark.bak-20260630T215115`.
 
 ## Branches
 
 | Branch | Tip | Purpose |
 |---|---|---|
-| `main` | `95e89010` | Public-ready productionized fork. No private deployment data. |
-| `lucien/main` | `624ff5de` | Live deployment branch. `main` + private overlay (deploy/rollback/drift/upstream-watch scripts, `DEPLOY.md`, `MIGRATION.lucien.md`, private spinner phrase pools). |
+| `main` | `9a883d10` | Public-ready productionized fork. No private deployment data. |
+| `lucien/main` | `f4c786c2` | Live deployment branch. `main` + private overlay (deploy/rollback/drift/upstream-watch scripts, `DEPLOY.md`, `MIGRATION.lucien.md`, private spinner phrase pools). |
 | `upstream/main` | `d57b1be9` | Force-rebaselined `npm pack @larksuite/openclaw-lark@2026.6.10`. |
 
 Tags:
