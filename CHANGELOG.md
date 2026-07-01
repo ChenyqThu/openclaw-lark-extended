@@ -3,6 +3,58 @@
 Release history for `@lucien/openclaw-lark-extended`. Tracks fork-side
 versions; the upstream baseline at each release is noted in parentheses.
 
+## 0.2.5 — openclaw core 2026.6.11 plugin-config-validation compat
+
+Hotfix. Core 2026.6.11 introduced strict validation of
+`plugins.entries.<id>.config` against the **plugin object's** `configSchema`.
+The fork shipped `configSchema: emptyPluginConfigSchema()`, which rejects every
+key — so `config.social` (the feishu-social extension's config) was rejected and
+the Feishu gateway crashed on startup:
+
+```
+Config validation failed: plugins.entries.openclaw-lark.config:
+invalid config: must not have additional properties: "social"
+```
+
+### Fix (one place: `index.js`)
+
+Replaced `emptyPluginConfigSchema()` with a real schema built from the
+manifest's existing `configSchema` declaration:
+
+```js
+// before
+configSchema: emptyPluginConfigSchema(),
+// after
+configSchema: buildJsonPluginConfigSchema(require('./openclaw.plugin.json').configSchema),
+```
+
+- `buildJsonPluginConfigSchema` lives in the `openclaw/plugin-sdk/core` subpath
+  (the plain `openclaw/plugin-sdk` entry does **not** re-export it); present in
+  both the dev SDK and the 2026.6.11 runtime, and the deployed extension symlinks
+  `openclaw` → the runtime.
+- Single source of truth: the `social` schema is declared once in
+  `openclaw.plugin.json`. It was previously inert — the 6.11 manifest loader
+  ignores the manifest's `configSchema`; only the plugin object's is validated.
+- **No `openclaw.json` change needed** — every live `social.*` key (contextGroups,
+  contextMessageCount, contextCacheTtlMs, stormThreshold, circuitBreakerMaxOutbound,
+  circuitBreakerSilenceMs, debugLog, enabled, adminDisplayName, contextTemplate) is
+  already covered by the schema.
+
+Orthogonal to the 2026.6.10 absorb (0.2.4): upstream also uses
+`emptyPluginConfigSchema()` and has no `social` feature, so the catch-up neither
+did nor could fix this. `feishu-social` is kept (its group-history context
+injection has no upstream equivalent) — this fix is what lets it load under 6.11.
+
+### Verification
+
+- `buildJsonPluginConfigSchema(manifest.configSchema).safeParse(liveConfig)` →
+  `success: true` against both the dev SDK and the 2026.6.11 runtime core;
+  correctly rejects unknown top-level and unknown `social.*` keys.
+- `bash scripts/smoke.sh` → ✓ syntax + 4 patch markers + 6 schema keys +
+  vitest 105/105.
+
+---
+
 ## 0.2.4 — baseline absorb of `@larksuite/openclaw-lark@2026.6.10`
 
 Bot-at-bot release absorb with reconciliation. Upstream 2026.6.10 adds native

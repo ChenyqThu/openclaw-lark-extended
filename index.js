@@ -10,7 +10,8 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isMessageExpired = exports.checkMessageGate = exports.parseMessageEvent = exports.handleFeishuReaction = exports.feishuPlugin = exports.buildMentionedCardContent = exports.buildMentionedMessage = exports.formatMentionAllForCard = exports.formatMentionAllForText = exports.formatMentionForCard = exports.formatMentionForText = exports.extractMessageBody = exports.nonBotMentions = exports.mentionedBot = exports.feishuMessageActions = exports.listChatMembersFeishu = exports.removeChatMembersFeishu = exports.addChatMembersFeishu = exports.updateChatFeishu = exports.forwardMessageFeishu = exports.VALID_FEISHU_EMOJI_TYPES = exports.FeishuEmoji = exports.listReactionsFeishu = exports.removeReactionFeishu = exports.addReactionFeishu = exports.probeFeishu = exports.sendMediaLark = exports.sendCardLark = exports.sendTextLark = exports.uploadAndSendMediaLark = exports.sendAudioLark = exports.sendFileLark = exports.sendImageLark = exports.uploadFileLark = exports.uploadImageLark = exports.getMessageFeishu = exports.editMessageFeishu = exports.updateCardFeishu = exports.sendCardFeishu = exports.sendMessageFeishu = exports.monitorFeishuProvider = void 0;
-const plugin_sdk_1 = require("openclaw/plugin-sdk");
+const plugin_sdk_core_1 = require("openclaw/plugin-sdk/core");
+const openclaw_manifest_1 = require("./openclaw.plugin.json");
 const plugin_1 = require("./src/channel/plugin.js");
 const lark_client_1 = require("./src/core/lark-client.js");
 const index_1 = require("./src/tools/oapi/index.js");
@@ -92,7 +93,12 @@ const plugin = {
     id: 'openclaw-lark',
     name: 'Feishu',
     description: 'Lark/Feishu channel plugin with im/doc/wiki/drive/task/calendar tools',
-    configSchema: (0, plugin_sdk_1.emptyPluginConfigSchema)(),
+    // Core 6.11 validates plugins.entries.<id>.config against THIS object's
+    // configSchema (not the manifest's). emptyPluginConfigSchema() rejected all
+    // keys → config.social crashed the gateway. Build a real schema from the
+    // manifest's configSchema (single source of truth). buildJsonPluginConfigSchema
+    // lives in the plugin-sdk /core subpath, present in both dev and runtime SDKs.
+    configSchema: (0, plugin_sdk_core_1.buildJsonPluginConfigSchema)(openclaw_manifest_1.configSchema),
     register(api) {
         lark_client_1.LarkClient.setRuntime(api.runtime);
         api.registerChannel({ plugin: plugin_1.feishuPlugin });
