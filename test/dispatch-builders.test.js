@@ -53,15 +53,52 @@ describe('buildMentionAnnotation', () => {
   });
 
   it('emits the must-respond directive when wasMentioned is true, even with zero non-bot mentions', () => {
-    // The Jarvis bug: only the bot itself was @-tagged. Body and the
-    // user-mention list are both empty after stripping, so the directive
-    // is the sole signal that the message is addressed to us.
+    // The Jarvis bug: only the bot itself was @-tagged. Body is empty
+    // after stripping. The annotation now includes the self bot in the
+    // recipient roster with a `[you, open_id: ...]` marker so the LLM
+    // sees a structured signal that the message is addressed to it.
     const ctx = { ...baseCtx, mentions: [botMention('ou_jarvis', 'Jarvis')] };
     const out = buildMentionAnnotation(ctx, { wasMentioned: true });
     expect(out).toContain('You were explicitly @-mentioned');
     expect(out).toContain('You MUST respond');
     expect(out).toContain('do NOT output NO_REPLY');
-    expect(out).not.toContain('open_id'); // no user-mention list when only bot was mentioned
+    // Self bot is now included in the roster as `Name [you, open_id: ...]`
+    expect(out).toContain('Jarvis [you, open_id: ou_jarvis]');
+  });
+
+  it('lists self bot alongside other @-mentioned users in multi-bot @ scenarios', () => {
+    // Multi-bot @ scenario: "@Self @OtherBot @user". Body gets stripped
+    // to look like "@OtherBot @user" only, so without the self entry in
+    // the roster the LLM cannot tell THIS bot is also a recipient.
+    const ctx = {
+      ...baseCtx,
+      mentions: [
+        botMention('ou_self', 'Self'),
+        botMention('ou_jarvis', 'Jarvis'),
+        userMention('ou_zero', 'Zero'),
+      ],
+    };
+    const out = buildMentionAnnotation(ctx, { wasMentioned: true });
+    expect(out).toContain('Self [you, open_id: ou_self]');
+    expect(out).toContain('Zero (open_id: ou_zero)');
+    // Other bots remain filtered out of the visible user list.
+    expect(out).not.toContain('Jarvis (open_id:');
+    expect(out).not.toContain('Jarvis [you');
+    // The self entry comes first in the roster.
+    expect(out.indexOf('Self [you')).toBeLessThan(out.indexOf('Zero (open_id:'));
+  });
+
+  it('omits the self [you] marker when wasMentioned is false', () => {
+    // If the bot was not actually addressed, even a bot mention in ctx
+    // (e.g. stray @ in history?) must not surface as a self [you] entry.
+    const ctx = {
+      ...baseCtx,
+      mentions: [botMention('ou_self', 'Self'), userMention('ou_zero', 'Zero')],
+    };
+    const out = buildMentionAnnotation(ctx, { wasMentioned: false });
+    expect(out).toContain('Zero (open_id: ou_zero)');
+    expect(out).not.toContain('[you, open_id:');
+    expect(out).not.toContain('You MUST respond');
   });
 
   it('emits both fragments when wasMentioned is true and other users were also @-mentioned', () => {
@@ -77,7 +114,10 @@ describe('buildMentionAnnotation', () => {
     const out = buildMentionAnnotation(ctx, { wasMentioned: true });
     expect(out).toContain('Zero (open_id: ou_zero)');
     expect(out).toContain('miniGG (open_id: ou_minigg)');
-    expect(out).not.toContain('Jarvis (open_id:'); // bot is filtered out of the user list
+    // Self bot is now surfaced via `[you, open_id: ...]`, not the
+    // standard `(open_id: ...)` form used for other users.
+    expect(out).toContain('Jarvis [you, open_id: ou_jarvis]');
+    expect(out).not.toContain('Jarvis (open_id:');
     expect(out).toContain('You MUST respond');
     // Upstream 2026.5.12 (PR #486) refactored buildMentionAnnotation into a
     // single bracketed [System: ...] block with multiple sections joined by
